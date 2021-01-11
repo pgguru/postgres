@@ -498,6 +498,7 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 		{"no-psqlrc", no_argument, NULL, 'X'},
 		{"help", optional_argument, NULL, 1},
 		{"csv", no_argument, NULL, 2},
+		{"stop", no_argument, NULL, 3},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -693,6 +694,9 @@ parse_psql_options(int argc, char *argv[], struct adhoc_opts *options)
 				break;
 			case 2:
 				pset.popt.topt.format = PRINT_CSV;
+				break;
+			case 3:
+				pset.on_error_stop = 1;
 				break;
 			default:
 		unknown_option:

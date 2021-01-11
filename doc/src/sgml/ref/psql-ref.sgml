@@ -425,6 +425,15 @@ EOF
     </varlistentry>
 
     <varlistentry>
+      <term><option>--stop</option></term>
+      <listitem>
+      <para>
+      Stop execution on the first error.  Shorthand for -v ON_ERROR_STOP=1.
+      </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
       <term><option>-t</option></term>
       <term><option>--tuples-only</option></term>
       <listitem>

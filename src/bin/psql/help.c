@@ -90,6 +90,7 @@ usage(unsigned short int pager)
 	fprintf(output, _("  -X, --no-psqlrc          do not read startup file (~/.psqlrc)\n"));
 	fprintf(output, _("  -1 (\"one\"), --single-transaction\n"
 					  "                           execute as a single transaction (if non-interactive)\n"));
+	fprintf(output, _("      --stop               stop processing commands on first error\n"));
 	fprintf(output, _("  -?, --help[=options]     show this help, then exit\n"));
 	fprintf(output, _("      --help=commands      list backslash commands, then exit\n"));
 	fprintf(output, _("      --help=variables     list special variables, then exit\n"));
