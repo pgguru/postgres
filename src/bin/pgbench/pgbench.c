@@ -85,6 +85,12 @@
 #define MM2_MUL_TIMES_8		UINT64CONST(0x35253c9ade8f4ca8)
 #define MM2_ROT				47
 
+/* Filler strings of indicated lenghts */
+#define FILLER_ACCOUNTS_PADDING "123456789012345678901234567890123456789012345678901234567890123456789012345678901234"
+#define FILLER_BRANCHES_PADDING "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678"
+#define FILLER_HISTORY_PADDING "1234567890123456789012"
+#define FILLER_TELLERS_PADDING "123456789012345678901234567890123456789012345678901234567890123456789012345678901234"
+
 /*
  * Multi-platform socket set implementations
  */
@@ -616,7 +622,7 @@ static const BuiltinScript builtin_script[] =
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
 		"UPDATE pgbench_tellers SET tbalance = tbalance + :delta WHERE tid = :tid;\n"
 		"UPDATE pgbench_branches SET bbalance = bbalance + :delta WHERE bid = :bid;\n"
-		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
+		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime, filler) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP, " FILLER_HISTORY_PADDING ");\n"
 		"END;\n"
 	},
 	{
@@ -629,7 +635,7 @@ static const BuiltinScript builtin_script[] =
 		"BEGIN;\n"
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;\n"
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
-		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
+		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime, filler) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP, " FILLER_HISTORY_PADDING ");\n"
 		"END;\n"
 	},
 	{
@@ -4009,14 +4015,12 @@ initCreateTables(PGconn *con)
 {
 	/*
 	 * Note: TPC-B requires at least 100 bytes per row, and the "filler"
-	 * fields in these table declarations were intended to comply with that.
-	 * The pgbench_accounts table complies with that because the "filler"
-	 * column is set to blank-padded empty string. But for all other tables
-	 * the columns default to NULL and so don't actually take any space.  We
-	 * could fix that by giving them non-null default values.  However, that
-	 * would completely break comparability of pgbench results with prior
-	 * versions. Since pgbench has never pretended to be fully TPC-B compliant
-	 * anyway, we stick with the historical behavior.
+	 * fields in these table declarations comply with that.  This does change
+	 * how "pgbench" has traditionally handled this, which in versions prior
+	 * to 15 used NULL values for this field for every table but the accounts
+	 * table.  It was determined that having this timing data be comparable to
+	 * other benchmarking tools was more important than compatibility with
+	 * previous runs of pgbench.
 	 */
 	struct ddlinfo
 	{
@@ -4146,18 +4150,16 @@ initGenerateDataClientSide(PGconn *con)
 	 */
 	for (i = 0; i < nbranches * scale; i++)
 	{
-		/* "filler" column defaults to NULL */
 		printfPQExpBuffer(&sql,
-						  "insert into pgbench_branches(bid,bbalance) values(%d,0)",
+						  "insert into pgbench_branches(bid,bbalance,filler) values(%d,0,'" FILLER_BRANCHES_PADDING "')",
 						  i + 1);
 		executeStatement(con, sql.data);
 	}
 
 	for (i = 0; i < ntellers * scale; i++)
 	{
-		/* "filler" column defaults to NULL */
 		printfPQExpBuffer(&sql,
-						  "insert into pgbench_tellers(tid,bid,tbalance) values (%d,%d,0)",
+						  "insert into pgbench_tellers(tid,bid,tbalance,filler) values (%d,%d,0,'" FILLER_TELLERS_PADDING "')",
 						  i + 1, i / ntellers + 1);
 		executeStatement(con, sql.data);
 	}
@@ -4181,7 +4183,7 @@ initGenerateDataClientSide(PGconn *con)
 
 		/* "filler" column defaults to blank padded empty string */
 		printfPQExpBuffer(&sql,
-						  INT64_FORMAT "\t" INT64_FORMAT "\t%d\t\n",
+						  INT64_FORMAT "\t" INT64_FORMAT "\t%d\t" FILLER_ACCOUNTS_PADDING "\n",
 						  j, k / naccounts + 1, 0);
 		if (PQputline(con, sql.data))
 		{
@@ -4248,8 +4250,8 @@ initGenerateDataClientSide(PGconn *con)
  * Fill the standard tables with some data generated on the server
  *
  * As already the case with the client-side data generation, the filler
- * column defaults to NULL in pgbench_branches and pgbench_tellers,
- * and is a blank-padded string in pgbench_accounts.
+ * columns default to blank-padded strings, so bring the record size up to
+ * 100.
  */
 static void
 initGenerateDataServerSide(PGconn *con)
@@ -4270,20 +4272,20 @@ initGenerateDataServerSide(PGconn *con)
 	initPQExpBuffer(&sql);
 
 	printfPQExpBuffer(&sql,
-					  "insert into pgbench_branches(bid,bbalance) "
-					  "select bid, 0 "
+					  "insert into pgbench_branches(bid,bbalance,filler) "
+					  "select bid, 0, '" FILLER_BRANCHES_PADDING "' "
 					  "from generate_series(1, %d) as bid", nbranches * scale);
 	executeStatement(con, sql.data);
 
 	printfPQExpBuffer(&sql,
-					  "insert into pgbench_tellers(tid,bid,tbalance) "
-					  "select tid, (tid - 1) / %d + 1, 0 "
+					  "insert into pgbench_tellers(tid,bid,tbalance,filler) "
+					  "select tid, (tid - 1) / %d + 1, 0, '" FILLER_TELLERS_PADDING "' "
 					  "from generate_series(1, %d) as tid", ntellers, ntellers * scale);
 	executeStatement(con, sql.data);
 
 	printfPQExpBuffer(&sql,
 					  "insert into pgbench_accounts(aid,bid,abalance,filler) "
-					  "select aid, (aid - 1) / %d + 1, 0, '' "
+					  "select aid, (aid - 1) / %d + 1, 0, '" FILLER_ACCOUNTS_PADDING "' "
 					  "from generate_series(1, " INT64_FORMAT ") as aid",
 					  naccounts, (int64) naccounts * scale);
 	executeStatement(con, sql.data);
