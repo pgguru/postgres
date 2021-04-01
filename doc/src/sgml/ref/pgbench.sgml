@@ -410,7 +410,7 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
       <listitem>
        <para>
         Add the specified built-in script to the list of scripts to be executed.
-        Available built-in scripts are: <literal>tpcb-like</literal>,
+        Available built-in scripts are: <literal>tpcb-like</literal>, <literal>insert-only</literal>,
         <literal>simple-update</literal> and <literal>select-only</literal>.
         Unambiguous prefixes of built-in names are accepted.
         With the special name <literal>list</literal>, show the list of built-in scripts
@@ -485,6 +485,16 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
         character, append a weight so that there is no ambiguity, for
         example <literal>filen@me@1</literal>.)
         See below for details.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><option>--insert-only</option></term>
+      <listitem>
+       <para>
+        Run built-in insert-only script.
+        Shorthand for <option>-b insert-only</option>.
        </para>
       </listitem>
      </varlistentry>
@@ -985,6 +995,11 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
   <para>
    If you select the <literal>select-only</literal> built-in (also <option>-S</option>),
    only the <command>SELECT</command> is issued.
+  </para>
+
+  <para>
+   If you select the <literal>insert-only</literal> built-in, 
+   only the <command>INSERT</command> is issued.
   </para>
  </refsect2>
 

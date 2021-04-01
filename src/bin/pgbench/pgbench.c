@@ -643,6 +643,15 @@ static const BuiltinScript builtin_script[] =
 		"<builtin: select only>",
 		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
+	},
+	{
+		"insert-only",
+		"<builtin: insert only>",
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
+		"\\set delta random(-5000, 5000)\n"
+		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime, filler) VALUES (:tid, :bid, :aid, :delta,	CURRENT_TIMESTAMP, " FILLER_HISTORY_PADDING ");\n"
 	}
 };
 
@@ -725,6 +734,8 @@ usage(void)
 		   "                           (same as \"-b simple-update\")\n"
 		   "  -S, --select-only        perform SELECT-only transactions\n"
 		   "                           (same as \"-b select-only\")\n"
+		   "  --insert-only            perform INSERT-only transactions\n"
+		   "                           (same as \"-b insert-only\")\n"
 		   "\nBenchmarking options:\n"
 		   "  -c, --client=NUM         number of concurrent database clients (default: 1)\n"
 		   "  -C, --connect            establish new connection for each transaction\n"
@@ -5771,6 +5782,7 @@ main(int argc, char **argv)
 		{"show-script", required_argument, NULL, 10},
 		{"partitions", required_argument, NULL, 11},
 		{"partition-method", required_argument, NULL, 12},
+		{"insert-only", no_argument, NULL, 13},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -6138,6 +6150,11 @@ main(int argc, char **argv)
 								 optarg);
 					exit(1);
 				}
+				break;
+			case 13:			/* insert-only */
+				process_builtin(findBuiltin("insert-only"), 1);
+				benchmarking_option_set = true;
+				internal_script_used = true;
 				break;
 			default:
 				fprintf(stderr, _("Try \"%s --help\" for more information.\n"), progname);
