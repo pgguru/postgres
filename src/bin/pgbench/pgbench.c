@@ -718,6 +718,7 @@ usage(void)
 		   "  -n, --no-vacuum          do not run VACUUM during initialization\n"
 		   "  -q, --quiet              quiet logging (one message each 5 seconds)\n"
 		   "  -s, --scale=NUM          scaling factor\n"
+		   "  --extra-indexes          create additional indexes on the tables\n"
 		   "  --foreign-keys           create foreign key constraints between tables\n"
 		   "  --index-tablespace=TABLESPACE\n"
 		   "                           create indexes in the specified tablespace\n"
@@ -4380,6 +4381,28 @@ initCreateFKeys(PGconn *con)
 }
 
 /*
+ * Create extra indexes on the standard tables
+ */
+static void
+initCreateExtraIndexes(PGconn *con)
+{
+	static const char *const DDLKEYs[] = {
+		"create index pgbench_tellers_bid_idx on pgbench_tellers (bid)",
+		"create index pgbench_accounts_bid_idx on pgbench_accounts (bid)",
+		"create index pgbench_history_aid_idx on pgbench_history (aid)",
+		"create index pgbench_history_bid_idx on pgbench_history (bid)",
+		"create index pgbench_history_tid_idx on pgbench_history (tid)"
+	};
+	int			i;
+
+	fprintf(stderr, "creating extra indexes...\n");
+	for (i = 0; i < lengthof(DDLKEYs); i++)
+	{
+		executeStatement(con, DDLKEYs[i]);
+	}
+}
+
+/*
  * Validate an initialization-steps string
  *
  * (We could just leave it to runInitSteps() to fail if there are wrong
@@ -4460,6 +4483,10 @@ runInitSteps(const char *initialize_steps)
 			case 'f':
 				op = "foreign keys";
 				initCreateFKeys(con);
+				break;
+			case 'i':
+				op = "extra indexes";
+				initCreateExtraIndexes(con);
 				break;
 			case ' ':
 				break;			/* ignore */
@@ -5783,6 +5810,7 @@ main(int argc, char **argv)
 		{"partitions", required_argument, NULL, 11},
 		{"partition-method", required_argument, NULL, 12},
 		{"insert-only", no_argument, NULL, 13},
+		{"extra-indexes", no_argument, NULL, 14},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -5790,6 +5818,7 @@ main(int argc, char **argv)
 	bool		is_init_mode = false;	/* initialize mode? */
 	char	   *initialize_steps = NULL;
 	bool		foreign_keys = false;
+	bool		extra_indexes = false;
 	bool		is_no_vacuum = false;
 	bool		do_vacuum_accounts = false; /* vacuum accounts table? */
 	int			optindex;
@@ -6156,6 +6185,10 @@ main(int argc, char **argv)
 				benchmarking_option_set = true;
 				internal_script_used = true;
 				break;
+			case 14:			/* indexes */
+				initialization_option_set = true;
+				extra_indexes = true;
+				break;
 			default:
 				fprintf(stderr, _("Try \"%s --help\" for more information.\n"), progname);
 				exit(1);
@@ -6268,6 +6301,19 @@ main(int argc, char **argv)
 					pg_realloc(initialize_steps,
 							   strlen(initialize_steps) + 2);
 				strcat(initialize_steps, "f");
+			}
+		}
+
+		/* foreign_keys always implies extra_indexes */
+		if (extra_indexes || foreign_keys)
+		{
+			/* Add 'i' to end of initialize_steps, if not already there */
+			if (strchr(initialize_steps, 'i') == NULL)
+			{
+				initialize_steps = (char *)
+					pg_realloc(initialize_steps,
+							   strlen(initialize_steps) + 2);
+				strcat(initialize_steps, "i");
 			}
 		}
 

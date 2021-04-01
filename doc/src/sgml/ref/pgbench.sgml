@@ -327,12 +327,24 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
      </varlistentry>
 
      <varlistentry>
+      <term><option>--extra-indexes</option></term>
+      <listitem>
+       <para>
+        Create extra indexes on the standard tables for referenced FK columns.
+        (This option adds the <literal>i</literal> step to the initialization
+        step sequence, if it is not already present.)
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
       <term><option>--foreign-keys</option></term>
       <listitem>
        <para>
         Create foreign key constraints between the standard tables.
         (This option adds the <literal>f</literal> step to the initialization
-        step sequence, if it is not already present.)
+        step sequence, if it is not already present.)  Also implies
+        <option>--extra-indexes</option>.
        </para>
       </listitem>
      </varlistentry>
