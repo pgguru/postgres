@@ -125,7 +125,8 @@ typedef enum pgssVersion
 	PGSS_V1_1,
 	PGSS_V1_2,
 	PGSS_V1_3,
-	PGSS_V1_8
+	PGSS_V1_8,
+	PGSS_V1_10
 } pgssVersion;
 
 typedef enum pgssStoreKind
@@ -337,6 +338,7 @@ PG_FUNCTION_INFO_V1(pg_stat_statements_reset_1_7);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_2);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_3);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_8);
+PG_FUNCTION_INFO_V1(pg_stat_statements_1_10);
 PG_FUNCTION_INFO_V1(pg_stat_statements);
 PG_FUNCTION_INFO_V1(pg_stat_statements_info);
 
@@ -1524,6 +1526,16 @@ pg_stat_statements_reset(PG_FUNCTION_ARGS)
  * function.  Unfortunately we weren't bright enough to do that for 1.1.
  */
 Datum
+pg_stat_statements_1_10(PG_FUNCTION_ARGS)
+{
+	bool		showtext = PG_GETARG_BOOL(0);
+
+	pg_stat_statements_internal(fcinfo, PGSS_V1_10, showtext);
+
+	return (Datum) 0;
+}
+
+Datum
 pg_stat_statements_1_8(PG_FUNCTION_ARGS)
 {
 	bool		showtext = PG_GETARG_BOOL(0);
@@ -1639,7 +1651,8 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 				elog(ERROR, "incorrect number of output arguments");
 			break;
 		case PG_STAT_STATEMENTS_COLS_V1_8:
-			if (api_version != PGSS_V1_8)
+			if (api_version != PGSS_V1_8 && \
+				api_version != PGSS_V1_10)
 				elog(ERROR, "incorrect number of output arguments");
 			break;
 		default:
@@ -1870,6 +1883,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 					 api_version == PGSS_V1_2 ? PG_STAT_STATEMENTS_COLS_V1_2 :
 					 api_version == PGSS_V1_3 ? PG_STAT_STATEMENTS_COLS_V1_3 :
 					 api_version == PGSS_V1_8 ? PG_STAT_STATEMENTS_COLS_V1_8 :
+					 api_version == PGSS_V1_10 ? PG_STAT_STATEMENTS_COLS_V1_8 :
 					 -1 /* fail if you forget to update this assert */ ));
 
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
