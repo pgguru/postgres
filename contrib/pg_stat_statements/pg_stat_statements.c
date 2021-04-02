@@ -121,7 +121,8 @@ typedef enum pgssVersion
 	PGSS_V1_2,
 	PGSS_V1_3,
 	PGSS_V1_8,
-	PGSS_V1_9
+	PGSS_V1_9,
+	PGSS_V1_10
 } pgssVersion;
 
 typedef enum pgssStoreKind
@@ -302,6 +303,7 @@ PG_FUNCTION_INFO_V1(pg_stat_statements_1_2);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_3);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_8);
 PG_FUNCTION_INFO_V1(pg_stat_statements_1_9);
+PG_FUNCTION_INFO_V1(pg_stat_statements_1_10);
 PG_FUNCTION_INFO_V1(pg_stat_statements);
 PG_FUNCTION_INFO_V1(pg_stat_statements_info);
 
@@ -1424,6 +1426,7 @@ pg_stat_statements_reset(PG_FUNCTION_ARGS)
 #define PG_STAT_STATEMENTS_COLS_V1_3	23
 #define PG_STAT_STATEMENTS_COLS_V1_8	32
 #define PG_STAT_STATEMENTS_COLS_V1_9	33
+#define PG_STAT_STATEMENTS_COLS_V1_10	33
 #define PG_STAT_STATEMENTS_COLS			33	/* maximum of above */
 
 /*
@@ -1436,6 +1439,16 @@ pg_stat_statements_reset(PG_FUNCTION_ARGS)
  * expected API version is identified by embedding it in the C name of the
  * function.  Unfortunately we weren't bright enough to do that for 1.1.
  */
+Datum
+pg_stat_statements_1_10(PG_FUNCTION_ARGS)
+{
+	bool		showtext = PG_GETARG_BOOL(0);
+
+	pg_stat_statements_internal(fcinfo, PGSS_V1_10, showtext);
+
+	return (Datum) 0;
+}
+
 Datum
 pg_stat_statements_1_9(PG_FUNCTION_ARGS)
 {
@@ -1508,6 +1521,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 	int			gc_count = 0;
 	HASH_SEQ_STATUS hash_seq;
 	pgssEntry  *entry;
+	int         unit_multiplier = 1;
 
 	/* Superusers or members of pg_read_all_stats members are allowed */
 	is_allowed_role = is_member_of_role(GetUserId(), ROLE_PG_READ_ALL_STATS);
@@ -1527,6 +1541,11 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("materialize mode required, but it is not allowed in this context")));
+
+	/* Update our block multiplier for returning bytes when >= 1.10 */
+	/* This will be used to unconditionally multiply against all units to account for the breaking API change in V1.10 */
+	if (api_version >= PGSS_V1_10)
+		unit_multiplier = BLCKSZ;
 
 	/* Switch into long-lived context to construct returned data structures */
 	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
@@ -1566,7 +1585,9 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 				elog(ERROR, "incorrect number of output arguments");
 			break;
 		case PG_STAT_STATEMENTS_COLS_V1_9:
-			if (api_version != PGSS_V1_9)
+			/* same number of columns in v1.9 and v1.10 */
+			if (api_version != PGSS_V1_9 &&	\
+				api_version != PGSS_V1_10)
 				elog(ERROR, "incorrect number of output arguments");
 			break;
 		default:
@@ -1759,18 +1780,18 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 			}
 		}
 		values[i++] = Int64GetDatumFast(tmp.rows);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_hit);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_read);
+		values[i++] = Int64GetDatumFast(tmp.shared_blks_hit * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.shared_blks_read * unit_multiplier);
 		if (api_version >= PGSS_V1_1)
-			values[i++] = Int64GetDatumFast(tmp.shared_blks_dirtied);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_written);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_hit);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_read);
+			values[i++] = Int64GetDatumFast(tmp.shared_blks_dirtied * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.shared_blks_written * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.local_blks_hit * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.local_blks_read * unit_multiplier);
 		if (api_version >= PGSS_V1_1)
-			values[i++] = Int64GetDatumFast(tmp.local_blks_dirtied);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_written);
-		values[i++] = Int64GetDatumFast(tmp.temp_blks_read);
-		values[i++] = Int64GetDatumFast(tmp.temp_blks_written);
+			values[i++] = Int64GetDatumFast(tmp.local_blks_dirtied * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.local_blks_written * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.temp_blks_read * unit_multiplier);
+		values[i++] = Int64GetDatumFast(tmp.temp_blks_written * unit_multiplier);
 		if (api_version >= PGSS_V1_1)
 		{
 			values[i++] = Float8GetDatumFast(tmp.blk_read_time);
@@ -1800,6 +1821,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 					 api_version == PGSS_V1_3 ? PG_STAT_STATEMENTS_COLS_V1_3 :
 					 api_version == PGSS_V1_8 ? PG_STAT_STATEMENTS_COLS_V1_8 :
 					 api_version == PGSS_V1_9 ? PG_STAT_STATEMENTS_COLS_V1_9 :
+					 api_version == PGSS_V1_10 ? PG_STAT_STATEMENTS_COLS_V1_10 :
 					 -1 /* fail if you forget to update this assert */ ));
 
 		tuplestore_putvalues(tupstore, tupdesc, values, nulls);
