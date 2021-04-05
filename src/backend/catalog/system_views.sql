@@ -580,7 +580,27 @@ FROM
     JOIN pg_authid rol ON l.classoid = rol.tableoid AND l.objoid = rol.oid;
 
 CREATE VIEW pg_settings AS
-    SELECT * FROM pg_show_all_settings() AS A;
+    SELECT
+        name,
+        current_setting(name) AS setting,
+        CASE
+            WHEN unit='B' THEN setting::numeric
+            WHEN unit='8kB' THEN setting::numeric * 8192
+            WHEN unit='kB' THEN setting::numeric * 1024
+            WHEN unit='MB' THEN setting::numeric * 1024 * 1024
+            WHEN unit='s' THEN setting::numeric
+            WHEN unit='ms' THEN round(setting::numeric / 1000,3)
+            WHEN unit='min' THEN setting::numeric * 60
+            WHEN unit IS NULL AND vartype='integer' THEN setting::numeric
+            WHEN unit IS NULL AND vartype='real' THEN setting::numeric
+            END AS numeric_value,
+        CASE
+            WHEN unit IN ('B','8kB','kB','MB') THEN 'bytes'
+            WHEN unit IN ('s','ms','min') THEN 'seconds'
+            WHEN unit IN ('integer,real') THEN 'numeric'
+            END AS units
+    FROM pg_show_all_settings() AS A
+    ORDER BY unit, name;
 
 CREATE RULE pg_settings_u AS
     ON UPDATE TO pg_settings
@@ -704,29 +724,32 @@ CREATE VIEW pg_stat_xact_user_tables AS
           schemaname !~ '^pg_toast';
 
 CREATE VIEW pg_statio_all_tables AS
+    WITH blks AS
+        (SELECT current_setting('block_size')::numeric AS bs)
     SELECT
             C.oid AS relid,
             N.nspname AS schemaname,
             C.relname AS relname,
-            pg_stat_get_blocks_fetched(C.oid) -
-                    pg_stat_get_blocks_hit(C.oid) AS heap_blks_read,
-            pg_stat_get_blocks_hit(C.oid) AS heap_blks_hit,
-            sum(pg_stat_get_blocks_fetched(I.indexrelid) -
-                    pg_stat_get_blocks_hit(I.indexrelid))::bigint AS idx_blks_read,
-            sum(pg_stat_get_blocks_hit(I.indexrelid))::bigint AS idx_blks_hit,
-            pg_stat_get_blocks_fetched(T.oid) -
-                    pg_stat_get_blocks_hit(T.oid) AS toast_blks_read,
-            pg_stat_get_blocks_hit(T.oid) AS toast_blks_hit,
-            pg_stat_get_blocks_fetched(X.indexrelid) -
-                    pg_stat_get_blocks_hit(X.indexrelid) AS tidx_blks_read,
-            pg_stat_get_blocks_hit(X.indexrelid) AS tidx_blks_hit
-    FROM pg_class C LEFT JOIN
+            blks.bs * (pg_stat_get_blocks_fetched(C.oid) -
+                    pg_stat_get_blocks_hit(C.oid)) AS heap_read_bytes,
+            blks.bs * pg_stat_get_blocks_hit(C.oid) AS heap_hit_bytes,
+            blks.bs * (sum(pg_stat_get_blocks_fetched(I.indexrelid) -
+                    pg_stat_get_blocks_hit(I.indexrelid))::bigint) AS idx_read_bytes,
+            blks.bs * (sum(pg_stat_get_blocks_hit(I.indexrelid))::bigint) AS idx_hit_bytes,
+            blks.bs * (pg_stat_get_blocks_fetched(T.oid) -
+                    pg_stat_get_blocks_hit(T.oid)) AS toast_read_bytes,
+            blks.bs * pg_stat_get_blocks_hit(T.oid) AS toast_hit_bytes,
+            blks.bs * (pg_stat_get_blocks_fetched(X.indexrelid) -
+                    pg_stat_get_blocks_hit(X.indexrelid)) AS tidx_read_bytes,
+            blks.bs * pg_stat_get_blocks_hit(X.indexrelid) AS tidx_hit_bytes
+            -- TODO Cache hit stats
+    FROM blks,pg_class C LEFT JOIN
             pg_index I ON C.oid = I.indrelid LEFT JOIN
             pg_class T ON C.reltoastrelid = T.oid LEFT JOIN
             pg_index X ON T.oid = X.indrelid
             LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
-    WHERE C.relkind IN ('r', 't', 'm')
-    GROUP BY C.oid, N.nspname, C.relname, T.oid, X.indexrelid;
+    WHERE   C.relkind IN ('r', 't', 'm')
+    GROUP BY blks.bs, C.oid, N.nspname, C.relname, T.oid, X.indexrelid;
 
 CREATE VIEW pg_statio_sys_tables AS
     SELECT * FROM pg_statio_all_tables
@@ -973,40 +996,35 @@ CREATE VIEW pg_stat_replication_slots AS
     WHERE r.datoid IS NOT NULL; -- excluding physical slots
 
 CREATE VIEW pg_stat_database AS
+    WITH blks AS
+        (SELECT current_setting('block_size')::numeric AS bs)
     SELECT
-            D.oid AS datid,
-            D.datname AS datname,
-                CASE
-                    WHEN (D.oid = (0)::oid) THEN 0
-                    ELSE pg_stat_get_db_numbackends(D.oid)
-                END AS numbackends,
-            pg_stat_get_db_xact_commit(D.oid) AS xact_commit,
-            pg_stat_get_db_xact_rollback(D.oid) AS xact_rollback,
-            pg_stat_get_db_blocks_fetched(D.oid) -
-                    pg_stat_get_db_blocks_hit(D.oid) AS blks_read,
-            pg_stat_get_db_blocks_hit(D.oid) AS blks_hit,
-            pg_stat_get_db_tuples_returned(D.oid) AS tup_returned,
-            pg_stat_get_db_tuples_fetched(D.oid) AS tup_fetched,
-            pg_stat_get_db_tuples_inserted(D.oid) AS tup_inserted,
-            pg_stat_get_db_tuples_updated(D.oid) AS tup_updated,
-            pg_stat_get_db_tuples_deleted(D.oid) AS tup_deleted,
-            pg_stat_get_db_conflict_all(D.oid) AS conflicts,
-            pg_stat_get_db_temp_files(D.oid) AS temp_files,
-            pg_stat_get_db_temp_bytes(D.oid) AS temp_bytes,
-            pg_stat_get_db_deadlocks(D.oid) AS deadlocks,
-            pg_stat_get_db_checksum_failures(D.oid) AS checksum_failures,
-            pg_stat_get_db_checksum_last_failure(D.oid) AS checksum_last_failure,
-            pg_stat_get_db_blk_read_time(D.oid) AS blk_read_time,
-            pg_stat_get_db_blk_write_time(D.oid) AS blk_write_time,
-            pg_stat_get_db_session_time(D.oid) AS session_time,
-            pg_stat_get_db_active_time(D.oid) AS active_time,
-            pg_stat_get_db_idle_in_transaction_time(D.oid) AS idle_in_transaction_time,
-            pg_stat_get_db_sessions(D.oid) AS sessions,
-            pg_stat_get_db_sessions_abandoned(D.oid) AS sessions_abandoned,
-            pg_stat_get_db_sessions_fatal(D.oid) AS sessions_fatal,
-            pg_stat_get_db_sessions_killed(D.oid) AS sessions_killed,
-            pg_stat_get_db_stat_reset_time(D.oid) AS stats_reset
-    FROM (
+        D.oid AS datid,
+        D.datname AS datname,
+            CASE
+                WHEN (D.oid = (0)::oid) THEN 0
+                ELSE pg_stat_get_db_numbackends(D.oid)
+            END AS numbackends,
+        pg_stat_get_db_xact_commit(D.oid) AS xact_commit,
+        pg_stat_get_db_xact_rollback(D.oid) AS xact_rollback,
+        bs * (pg_stat_get_db_blocks_fetched(D.oid) -
+            pg_stat_get_db_blocks_hit(D.oid)) AS read_bytes,
+        bs * (pg_stat_get_db_blocks_hit(D.oid)) AS hit_bytes,
+        pg_stat_get_db_tuples_returned(D.oid) AS tup_returned,
+        pg_stat_get_db_tuples_fetched(D.oid) AS tup_fetched,
+        pg_stat_get_db_tuples_inserted(D.oid) AS tup_inserted,
+        pg_stat_get_db_tuples_updated(D.oid) AS tup_updated,
+        pg_stat_get_db_tuples_deleted(D.oid) AS tup_deleted,
+        pg_stat_get_db_conflict_all(D.oid) AS conflicts,
+        pg_stat_get_db_temp_files(D.oid) AS temp_files,
+        pg_stat_get_db_temp_bytes(D.oid) AS temp_bytes,
+        pg_stat_get_db_deadlocks(D.oid) AS deadlocks,
+        pg_stat_get_db_checksum_failures(D.oid) AS checksum_failures,
+        pg_stat_get_db_checksum_last_failure(D.oid) AS checksum_last_failure,
+        pg_stat_get_db_blk_read_time(D.oid) AS blk_read_time,
+        pg_stat_get_db_blk_write_time(D.oid) AS blk_write_time,
+        pg_stat_get_db_stat_reset_time(D.oid) AS stats_reset
+    FROM blks,(
         SELECT 0 AS oid, NULL::name AS datname
         UNION ALL
         SELECT oid, datname FROM pg_database
@@ -1059,18 +1077,23 @@ CREATE VIEW pg_stat_archiver AS
     FROM pg_stat_get_archiver() s;
 
 CREATE VIEW pg_stat_bgwriter AS
+    WITH blks AS
+        (SELECT current_setting('block_size')::numeric AS bs)
     SELECT
         pg_stat_get_bgwriter_timed_checkpoints() AS checkpoints_timed,
         pg_stat_get_bgwriter_requested_checkpoints() AS checkpoints_req,
         pg_stat_get_checkpoint_write_time() AS checkpoint_write_time,
         pg_stat_get_checkpoint_sync_time() AS checkpoint_sync_time,
-        pg_stat_get_bgwriter_buf_written_checkpoints() AS buffers_checkpoint,
-        pg_stat_get_bgwriter_buf_written_clean() AS buffers_clean,
+        pg_stat_get_bgwriter_buf_written_checkpoints() * bs AS checkpoint_bytes,
+        pg_stat_get_bgwriter_buf_written_clean() * bs AS clean_bytes,
         pg_stat_get_bgwriter_maxwritten_clean() AS maxwritten_clean,
-        pg_stat_get_buf_written_backend() AS buffers_backend,
-        pg_stat_get_buf_fsync_backend() AS buffers_backend_fsync,
-        pg_stat_get_buf_alloc() AS buffers_alloc,
-        pg_stat_get_bgwriter_stat_reset_time() AS stats_reset;
+        pg_stat_get_buf_written_backend() * bs AS backend_bytes,
+        pg_stat_get_buf_fsync_backend() * bs AS backend_fsync_bytes,
+        pg_stat_get_buf_alloc() * bs AS alloc_bytes,
+        pg_stat_get_bgwriter_stat_reset_time() AS stats_reset,
+		pg_stat_get_bgwriter_buf_written_checkpoints() AS writes_checkpoint
+    FROM blks
+		;
 
 CREATE VIEW pg_stat_wal AS
     SELECT
