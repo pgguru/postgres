@@ -1095,6 +1095,47 @@ CREATE VIEW pg_stat_bgwriter AS
     FROM blks
 		;
 
+CREATE VIEW pg_stat_block AS
+    WITH blks AS
+        (SELECT current_setting('block_size')::numeric AS bs)
+    SELECT
+      pg_catalog.pg_get_userbyid(c.relowner) as owner,
+      n.nspname as schema_name,
+      c.relname as relation_name,
+      CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view'
+        WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index'
+        WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special'
+        WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table'
+        WHEN 'I' THEN 'partitioned index' END as relation_kind,
+      c2.relname AS idxrel,
+      pg_relation_size(C.oid) AS rel_bytes,
+      pg_size_pretty(pg_relation_size(C.oid)) AS rel_bytes_pretty,
+      pg_stat_get_numscans(C2.oid) AS idx_scan,
+      pg_stat_get_tuples_returned(C2.oid) AS idx_tup_read,
+      pg_stat_get_tuples_fetched(C2.oid) AS idx_tup_fetch,
+      bs * (pg_stat_get_blocks_fetched(C.oid) -
+          pg_stat_get_blocks_hit(C.oid)) AS heap_read_bytes,
+      bs * pg_stat_get_blocks_hit(C.oid) AS heap_hit_bytes,
+      bs * (pg_stat_get_blocks_fetched(T.oid) -
+          pg_stat_get_blocks_hit(T.oid)) AS toast_read_bytes,
+      bs * pg_stat_get_blocks_hit(T.oid) AS toast_hit_bytes,
+      bs * (pg_stat_get_blocks_fetched(TIC.oid) -
+          pg_stat_get_blocks_hit(TIC.oid)) AS toast_index_read_bytes,
+      bs * pg_stat_get_blocks_hit(TIC.oid) AS toast_index_hit_bytes
+    FROM blks, pg_catalog.pg_class c
+         LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid
+         LEFT JOIN pg_catalog.pg_class c2 ON i.indrelid = c2.oid
+         LEFT JOIN pg_catalog.pg_class T ON C.reltoastrelid = T.oid
+         LEFT JOIN pg_catalog.pg_index TI ON (T.oid = TI.indrelid AND TI.indisprimary)
+         LEFT JOIN pg_catalog.pg_class TIC ON TIC.oid = TI.indexrelid
+    WHERE c.relkind IN ('r','p','i','m','S','f','')
+          AND n.nspname <> 'pg_catalog'
+          AND n.nspname <> 'information_schema'
+          AND n.nspname !~ '^pg_toast'
+      AND pg_catalog.pg_table_is_visible(c.oid)
+    ORDER BY c.relkind,n.nspname,c.relname;
+
 CREATE VIEW pg_stat_wal AS
     SELECT
         w.wal_records,
