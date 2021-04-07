@@ -112,6 +112,16 @@ typedef struct socket_set
 
 #endif							/* POLL_USING_SELECT */
 
+#define MC_PARAM_MAX 10			/* max number of multiconnect params */
+
+/* struct support for multiconnect params */
+typedef struct param_set
+{
+	int maxparam;
+	int curparam;
+	char *params[MC_PARAM_MAX];
+} param_set;
+
 /*
  * Multi-platform thread implementations
  */
@@ -276,12 +286,15 @@ bool		is_connect;			/* establish connection for each transaction */
 bool		report_per_command; /* report per-command latencies */
 int			main_pid;			/* main process id used in log filename */
 
-const char *pghost = NULL;
-const char *pgport = NULL;
-const char *username = NULL;
 const char *dbName = NULL;
 char	   *logfile_prefix = NULL;
 const char *progname;
+
+/* multiconnect param settings */
+param_set *mc_host = NULL;
+param_set *mc_port = NULL;
+param_set *mc_username = NULL;
+param_set *mc_dbname = NULL;
 
 #define WSEP '@'				/* weight separator */
 
@@ -663,7 +676,9 @@ static void clear_socket_set(socket_set *sa);
 static void add_socket_to_set(socket_set *sa, int fd, int idx);
 static int	wait_on_socket_set(socket_set *sa, int64 usecs);
 static bool socket_has_input(socket_set *sa, int fd, int idx);
-
+static param_set *new_multiconnect_param();
+static void push_multiconnect_param(param_set *s, const char *item);
+static const char *GetNextParamSet(param_set *s);
 
 /* callback functions for our flex lexer */
 static const PsqlScanCallbacks pgbench_callbacks = {
@@ -1363,15 +1378,15 @@ doConnect(void)
 		const char *values[PARAMS_ARRAY_SIZE];
 
 		keywords[0] = "host";
-		values[0] = pghost;
+		values[0] = GetNextParamSet(mc_host);
 		keywords[1] = "port";
-		values[1] = pgport;
+		values[1] = GetNextParamSet(mc_port);
 		keywords[2] = "user";
-		values[2] = username;
+		values[2] = GetNextParamSet(mc_username);
 		keywords[3] = "password";
 		values[3] = password;
 		keywords[4] = "dbname";
-		values[4] = dbName;
+		values[4] = GetNextParamSet(mc_dbname);
 		keywords[5] = "fallback_application_name";
 		values[5] = progname;
 		keywords[6] = NULL;
@@ -5724,6 +5739,37 @@ set_random_seed(const char *seed)
 	return true;
 }
 
+static param_set *
+new_multiconnect_param() {
+	param_set *params = pg_malloc0(sizeof(param_set));
+
+	return params;
+}
+
+static void
+push_multiconnect_param(param_set *set, const char *item) {
+	if (set->maxparam >= MC_PARAM_MAX) {
+		pg_log_warning("Params already at limit (%d); ignoring new param %s",
+					   MC_PARAM_MAX,
+					   item
+			);
+		return;
+	}
+
+	set->params[set->maxparam++] = (char *)item;
+}
+
+static const char*
+GetNextParamSet(param_set *s) {
+	char* ret = s->params[s->curparam];
+
+	s->curparam++;
+	if (s->curparam >= s->maxparam)
+		s->curparam = 0;
+
+	return ret;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -5835,6 +5881,11 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	mc_dbname = new_multiconnect_param();
+	mc_username = new_multiconnect_param();
+	mc_host = new_multiconnect_param();
+	mc_port = new_multiconnect_param();
+
 	while ((c = getopt_long(argc, argv, "iI:h:nvp:dqb:SNc:j:Crs:t:T:U:lf:D:F:M:P:R:L:", long_options, &optindex)) != -1)
 	{
 		char	   *script;
@@ -5852,7 +5903,7 @@ main(int argc, char **argv)
 				initialization_option_set = true;
 				break;
 			case 'h':
-				pghost = pg_strdup(optarg);
+				push_multiconnect_param(mc_host, pg_strdup(optarg));
 				break;
 			case 'n':
 				is_no_vacuum = true;
@@ -5862,7 +5913,7 @@ main(int argc, char **argv)
 				do_vacuum_accounts = true;
 				break;
 			case 'p':
-				pgport = pg_strdup(optarg);
+				push_multiconnect_param(mc_port, pg_strdup(optarg));
 				break;
 			case 'd':
 				pg_logging_increase_verbosity();
@@ -5946,7 +5997,7 @@ main(int argc, char **argv)
 				}
 				break;
 			case 'U':
-				username = pg_strdup(optarg);
+				push_multiconnect_param(mc_username, pg_strdup(optarg));
 				break;
 			case 'l':
 				benchmarking_option_set = true;
@@ -6175,6 +6226,17 @@ main(int argc, char **argv)
 	if (num_scripts > 1)
 		per_script_stats = true;
 
+	/* If we've determined we want multiple users to connect, we likely will
+	 * want to have raised the client number, so warn if we have less clients
+	 * than defined users. */
+
+	if (mc_username->maxparam > nclients) {
+		pg_log_warning("defined %d users to connect at, but did not have as many clients (do you want `-c %d` too?)",
+					   mc_username->maxparam,
+					   mc_username->maxparam
+			);
+	}
+
 	/*
 	 * Don't need more threads than there are clients.  (This is not merely an
 	 * optimization; throttle_delay is calculated incorrectly below if some
@@ -6202,6 +6264,11 @@ main(int argc, char **argv)
 			dbName = get_user_name_or_exit(progname);
 	}
 
+	/* TODO: allow multiple databases too?  For now just use the single one
+	 * we've detected. */
+
+	push_multiconnect_param(mc_dbname, dbName);
+	
 	if (optind < argc)
 	{
 		pg_log_fatal("too many command-line arguments (first is \"%s\")",
