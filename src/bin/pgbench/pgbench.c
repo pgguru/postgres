@@ -69,6 +69,7 @@
 #include "pgbench.h"
 #include "port/pg_bitutils.h"
 #include "portability/instr_time.h"
+#include "lib/stringinfo.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -111,16 +112,6 @@ typedef struct socket_set
 } socket_set;
 
 #endif							/* POLL_USING_SELECT */
-
-#define MC_PARAM_MAX 10			/* max number of multiconnect params */
-
-/* struct support for multiconnect params */
-typedef struct param_set
-{
-	int maxparam;
-	int curparam;
-	char *params[MC_PARAM_MAX];
-} param_set;
 
 /*
  * Multi-platform thread implementations
@@ -285,16 +276,16 @@ int			nthreads = 1;		/* number of threads */
 bool		is_connect;			/* establish connection for each transaction */
 bool		report_per_command; /* report per-command latencies */
 int			main_pid;			/* main process id used in log filename */
+int         num_service_names = 0; /* how many service file names are in the indicated service file */
+int         cur_service_index = 0; /* the index of the next service file; used for round-robin */
 
+const char *pghost = NULL;
+const char *pgport = NULL;
+const char *username = NULL;
 const char *dbName = NULL;
 char	   *logfile_prefix = NULL;
 const char *progname;
-
-/* multiconnect param settings */
-param_set *mc_host = NULL;
-param_set *mc_port = NULL;
-param_set *mc_username = NULL;
-param_set *mc_dbname = NULL;
+const char **service_names = NULL;
 
 #define WSEP '@'				/* weight separator */
 
@@ -562,6 +553,14 @@ typedef enum QueryMode
 static QueryMode querymode = QUERY_SIMPLE;
 static const char *QUERYMODE[] = {"simple", "extended", "prepared"};
 
+typedef enum MultiConnectStrategy
+{
+	MC_ROUND_ROBIN,
+	MC_RANDOM
+} MultiConnectStrategy;
+
+static MultiConnectStrategy multiconnect_strategy = MC_ROUND_ROBIN;
+
 /*
  * struct Command represents one command in a script.
  *
@@ -676,9 +675,7 @@ static void clear_socket_set(socket_set *sa);
 static void add_socket_to_set(socket_set *sa, int fd, int idx);
 static int	wait_on_socket_set(socket_set *sa, int64 usecs);
 static bool socket_has_input(socket_set *sa, int fd, int idx);
-static param_set *new_multiconnect_param();
-static void push_multiconnect_param(param_set *s, const char *item);
-static const char *GetNextParamSet(param_set *s);
+static const char **availableServiceEntries(const char *serviceFile);
 
 /* callback functions for our flex lexer */
 static const PsqlScanCallbacks pgbench_callbacks = {
@@ -742,6 +739,10 @@ usage(void)
 		   "  -j, --jobs=NUM           number of threads (default: 1)\n"
 		   "  -l, --log                write transaction times to log file\n"
 		   "  -L, --latency-limit=NUM  count transactions lasting more than NUM ms as late\n"
+		   "  -m, --multiconnect=FILE  use multiple auth defined in the given service file\n"
+		   "  -g, --multiconnect-strategy=roundrobin|random\n"
+		   "                           use the given strategy for choosing the service to connect as\n"
+		   "                           (default: roundrobin)\n"
 		   "  -M, --protocol=simple|extended|prepared\n"
 		   "                           protocol for submitting queries (default: simple)\n"
 		   "  -n, --no-vacuum          do not run VACUUM before tests\n"
@@ -1367,6 +1368,33 @@ doConnect(void)
 	static char *password = NULL;
 
 	/*
+	 * If we are doing a round-robin of service files names, then use/choose the next name
+	 */
+	if (num_service_names) {
+		const char *service;
+
+		if (multiconnect_strategy == MC_ROUND_ROBIN)
+		{
+			service = service_names[cur_service_index++];
+
+			if (cur_service_index >= num_service_names)
+				cur_service_index = 0;
+		}
+		else if (multiconnect_strategy == MC_RANDOM)
+		{
+			/*
+			 * We need to get random int <= num_service_names; since this is
+			 * infrequently-called and just need uniform integer distribution,
+			 * we are using system random() instead of one of the more complex
+			 * functions available in this file.
+			 */
+			service = service_names[ ((unsigned long)random()) % num_service_names ];
+		}
+		pg_log_info("using service: %s", service);
+		setenv("PGSERVICE", service, true);
+	}
+
+	/*
 	 * Start the connection.  Loop until we have a password if requested by
 	 * backend.
 	 */
@@ -1378,15 +1406,15 @@ doConnect(void)
 		const char *values[PARAMS_ARRAY_SIZE];
 
 		keywords[0] = "host";
-		values[0] = GetNextParamSet(mc_host);
+		values[0] = pghost;
 		keywords[1] = "port";
-		values[1] = GetNextParamSet(mc_port);
+		values[1] = pgport;
 		keywords[2] = "user";
-		values[2] = GetNextParamSet(mc_username);
+		values[2] = username;
 		keywords[3] = "password";
 		values[3] = password;
 		keywords[4] = "dbname";
-		values[4] = GetNextParamSet(mc_dbname);
+		values[4] = dbName;
 		keywords[5] = "fallback_application_name";
 		values[5] = progname;
 		keywords[6] = NULL;
@@ -5739,35 +5767,72 @@ set_random_seed(const char *seed)
 	return true;
 }
 
-static param_set *
-new_multiconnect_param() {
-	param_set *params = pg_malloc0(sizeof(param_set));
+static const char**
+availableServiceEntries(const char *serviceFile)
+{
+	int			linenr = 0,
+				num_svc = 0,
+				max_svc = 10;
+	FILE	   *f;
+	char	   *line, **services;
+	StringInfoData linebuf;
 
-	return params;
-}
-
-static void
-push_multiconnect_param(param_set *set, const char *item) {
-	if (set->maxparam >= MC_PARAM_MAX) {
-		pg_log_warning("Params already at limit (%d); ignoring new param %s",
-					   MC_PARAM_MAX,
-					   item
-			);
-		return;
+	f = fopen(serviceFile, "r");
+	if (f == NULL)
+	{
+		return NULL;
 	}
 
-	set->params[set->maxparam++] = (char *)item;
-}
+	initStringInfo(&linebuf);
 
-static const char*
-GetNextParamSet(param_set *s) {
-	char* ret = s->params[s->curparam];
+	services = (char **)pg_malloc0(max_svc * sizeof(char *));
+	
+	while (pg_get_line_buf(f, &linebuf))
+	{
+		linenr++;
 
-	s->curparam++;
-	if (s->curparam >= s->maxparam)
-		s->curparam = 0;
+		/* ignore whitespace at end of line, especially the newline */
+		while (linebuf.len > 0 &&
+			   isspace((unsigned char) linebuf.data[linebuf.len - 1]))
+			linebuf.data[--linebuf.len] = '\0';
 
-	return ret;
+		line = linebuf.data;
+
+		/* ignore leading whitespace too */
+		while (*line && isspace((unsigned char) line[0]))
+			line++;
+
+		/* ignore comments and empty lines */
+		if (line[0] == '\0' || line[0] == '#')
+			continue;
+
+		/* Check for groupname section */
+		if (line[0] == '[')
+		{
+			char *endp;
+
+			line++;
+
+			endp = strchr(line, ']');
+			if (endp && (endp - line) > 0) {
+				/* add the literal block to the chunk */
+				services[num_svc] = pnstrdup(line, (endp - line));
+
+				/* possibly expand memory */
+				if (++num_svc >= max_svc) {
+					max_svc += 10;
+					services = pg_realloc(services, max_svc * sizeof(char *));
+				}
+
+				/* null out the next possible entry */
+				services[num_svc] = NULL;
+			}
+		}
+	}
+
+	fclose(f);
+	pfree(linebuf.data);
+	return (const char**)services;
 }
 
 int
@@ -5788,6 +5853,8 @@ main(int argc, char **argv)
 		{"jobs", required_argument, NULL, 'j'},
 		{"log", no_argument, NULL, 'l'},
 		{"latency-limit", required_argument, NULL, 'L'},
+		{"multiconnect", required_argument, NULL, 'm'},
+		{"multiconnect-strategy", required_argument, NULL, 'g'},
 		{"no-vacuum", no_argument, NULL, 'n'},
 		{"port", required_argument, NULL, 'p'},
 		{"progress", required_argument, NULL, 'P'},
@@ -5881,12 +5948,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	mc_dbname = new_multiconnect_param();
-	mc_username = new_multiconnect_param();
-	mc_host = new_multiconnect_param();
-	mc_port = new_multiconnect_param();
-
-	while ((c = getopt_long(argc, argv, "iI:h:nvp:dqb:SNc:j:Crs:t:T:U:lf:D:F:M:P:R:L:", long_options, &optindex)) != -1)
+	while ((c = getopt_long(argc, argv, "iI:h:nvp:dqb:SNc:j:Crs:t:T:U:lf:D:F:M:m:g:P:R:L:", long_options, &optindex)) != -1)
 	{
 		char	   *script;
 
@@ -5903,7 +5965,7 @@ main(int argc, char **argv)
 				initialization_option_set = true;
 				break;
 			case 'h':
-				push_multiconnect_param(mc_host, pg_strdup(optarg));
+				pghost = pg_strdup(optarg);
 				break;
 			case 'n':
 				is_no_vacuum = true;
@@ -5913,7 +5975,7 @@ main(int argc, char **argv)
 				do_vacuum_accounts = true;
 				break;
 			case 'p':
-				push_multiconnect_param(mc_port, pg_strdup(optarg));
+				pgport = pg_strdup(optarg);
 				break;
 			case 'd':
 				pg_logging_increase_verbosity();
@@ -5997,7 +6059,7 @@ main(int argc, char **argv)
 				}
 				break;
 			case 'U':
-				push_multiconnect_param(mc_username, pg_strdup(optarg));
+				username = pg_strdup(optarg);
 				break;
 			case 'l':
 				benchmarking_option_set = true;
@@ -6056,6 +6118,55 @@ main(int argc, char **argv)
 				if (fillfactor < 10 || fillfactor > 100)
 				{
 					pg_log_fatal("invalid fillfactor: \"%s\"", optarg);
+					exit(1);
+				}
+				break;
+			case 'm':
+			    {
+					char **p;
+
+					service_names = availableServiceEntries(optarg);
+					p = (char**)service_names;
+
+					if (!service_names)
+					{
+						pg_log_fatal("Couldn't find any services in file '%s'", optarg);
+						exit(1);
+					}
+
+					while (*(p++))
+						num_service_names++;
+
+					/*
+					 * If we found non-zero services in our file then we can set
+					 * the PGSERVICEFILE variable to point to the file we parsed,
+					 * otherwise there is no point.
+					 */
+
+					if (num_service_names) {
+						setenv("PGSERVICEFILE", optarg, true);
+
+						/*
+						 * Warn if number of services exceeds the number of
+						 * clients expected.
+						 */
+
+						if (num_service_names > nclients)
+							pg_log_warning("Found %d services defined, but -c is set to %d; did you mean to increase -c?",
+										   num_service_names,
+										   nclients
+								);
+					}
+				}
+				break;
+			case 'g':
+				if (strcmp(optarg, "roundrobin") == 0)
+					multiconnect_strategy = MC_ROUND_ROBIN;
+				else if (strcmp(optarg, "random") == 0)
+					multiconnect_strategy = MC_RANDOM;
+				else
+				{
+					pg_log_fatal("Unrecognized multiconnect strategy: %s", optarg);
 					exit(1);
 				}
 				break;
@@ -6226,17 +6337,6 @@ main(int argc, char **argv)
 	if (num_scripts > 1)
 		per_script_stats = true;
 
-	/* If we've determined we want multiple users to connect, we likely will
-	 * want to have raised the client number, so warn if we have less clients
-	 * than defined users. */
-
-	if (mc_username->maxparam > nclients) {
-		pg_log_warning("defined %d users to connect at, but did not have as many clients (do you want `-c %d` too?)",
-					   mc_username->maxparam,
-					   mc_username->maxparam
-			);
-	}
-
 	/*
 	 * Don't need more threads than there are clients.  (This is not merely an
 	 * optimization; throttle_delay is calculated incorrectly below if some
@@ -6264,11 +6364,6 @@ main(int argc, char **argv)
 			dbName = get_user_name_or_exit(progname);
 	}
 
-	/* TODO: allow multiple databases too?  For now just use the single one
-	 * we've detected. */
-
-	push_multiconnect_param(mc_dbname, dbName);
-	
 	if (optind < argc)
 	{
 		pg_log_fatal("too many command-line arguments (first is \"%s\")",
