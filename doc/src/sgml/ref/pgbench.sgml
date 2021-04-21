@@ -161,6 +161,11 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
         <envar>PGDATABASE</envar> is used. If that is not set, the
         user name specified for the connection is used.
        </para>
+       <para>
+        If <literal>multiconnect</literal> mode is enabled, a defined
+        <literal>dbname</literal> in the chosen service will override this
+        value.
+       </para>
       </listitem>
      </varlistentry>
 
@@ -841,11 +846,49 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
     <variablelist>
 
      <varlistentry>
+      <term><option>-m</option> <replaceable>servicefile</replaceable></term>
+      <term><option>--multiconnect-file=</option><replaceable>servicefile</replaceable></term>
+      <listitem>
+       <para>
+        Turns on <literal>multiconnect</literal> mode and uses the given
+        <literal>pg_service</literal>-style file to derive connection
+        information from.  Any/all connection parameters in this file will
+        overwrite any that were provided in the command-line.
+       </para>
+       <para>
+        Since this behavior will make a connection using
+        the <envar>PGSERVICEFILE</envar> mechanism, it is possible to
+        connect to other databases than the one provided in the original
+        command invocation.  This option assumes that the user has previously
+        run the necessarily initialization steps against all databases that
+        would be accessed via this service file.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
+      <term><option>-g roundrobin|random</option></term>
+      <term><option>--multiconnect-strategy=roundrobin|random</option></term>
+      <listitem>
+       <para>
+        Selects the strategy by which <literal>multiconnect</literal> mode
+        uses the connections defined in the indicated service file.  The
+        default value is <literal>roundrobin</literal>.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
       <term><option>-h</option> <replaceable>hostname</replaceable></term>
       <term><option>--host=</option><replaceable>hostname</replaceable></term>
       <listitem>
        <para>
         The database server's host name
+       </para>
+       <para>
+        If <literal>multiconnect</literal> mode is enabled, a defined
+        <literal>host</literal> in the chosen service will override this
+        value.
        </para>
       </listitem>
      </varlistentry>
@@ -857,6 +900,11 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
        <para>
         The database server's port number
        </para>
+       <para>
+        If <literal>multiconnect</literal> mode is enabled, a defined
+        <literal>port</literal> in the chosen service will override this
+        value.
+       </para>
       </listitem>
      </varlistentry>
 
@@ -866,6 +914,11 @@ pgbench <optional> <replaceable>options</replaceable> </optional> <replaceable>d
       <listitem>
        <para>
         The user name to connect as
+       </para>
+       <para>
+        If <literal>multiconnect</literal> mode is enabled, a defined
+        <literal>user</literal> in the chosen service will override this
+        value.
        </para>
       </listitem>
      </varlistentry>
