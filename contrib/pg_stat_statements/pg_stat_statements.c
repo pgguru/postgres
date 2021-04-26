@@ -1502,6 +1502,24 @@ pg_stat_statements(PG_FUNCTION_ARGS)
 	return (Datum) 0;
 }
 
+static inline Datum ReportUnitSize(pgssVersion vers, uint64 val) {
+	if (vers < PGSS_V1_10)
+		return Int64GetDatumFast(val);
+
+	char buf[256];
+	Datum ret;
+
+	snprintf(buf, sizeof buf, UINT64_FORMAT, val * 8192);
+
+	ret = DirectFunctionCall3(numeric_in,
+							  CStringGetDatum(buf),
+							  ObjectIdGetDatum(0),
+							  Int32GetDatum(-1));
+
+	return ret;
+}
+
+
 /* Common code for all versions of pg_stat_statements() */
 static void
 pg_stat_statements_internal(FunctionCallInfo fcinfo,
@@ -1521,7 +1539,7 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 	int			gc_count = 0;
 	HASH_SEQ_STATUS hash_seq;
 	pgssEntry  *entry;
-	int         unit_multiplier = 1;
+	char		buf[256];
 
 	/* Superusers or members of pg_read_all_stats members are allowed */
 	is_allowed_role = is_member_of_role(GetUserId(), ROLE_PG_READ_ALL_STATS);
@@ -1541,11 +1559,6 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("materialize mode required, but it is not allowed in this context")));
-
-	/* Update our block multiplier for returning bytes when >= 1.10 */
-	/* This will be used to unconditionally multiply against all units to account for the breaking API change in V1.10 */
-	if (api_version >= PGSS_V1_10)
-		unit_multiplier = BLCKSZ;
 
 	/* Switch into long-lived context to construct returned data structures */
 	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
@@ -1780,18 +1793,18 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 			}
 		}
 		values[i++] = Int64GetDatumFast(tmp.rows);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_hit * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_read * unit_multiplier);
+		values[i++] = ReportUnitSize(api_version,tmp.shared_blks_hit);
+		values[i++] = ReportUnitSize(api_version,tmp.shared_blks_read);
 		if (api_version >= PGSS_V1_1)
-			values[i++] = Int64GetDatumFast(tmp.shared_blks_dirtied * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.shared_blks_written * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_hit * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_read * unit_multiplier);
+			values[i++] = ReportUnitSize(api_version,tmp.shared_blks_dirtied);
+		values[i++] = ReportUnitSize(api_version,tmp.shared_blks_written);
+		values[i++] = ReportUnitSize(api_version,tmp.local_blks_hit);
+		values[i++] = ReportUnitSize(api_version,tmp.local_blks_read);
 		if (api_version >= PGSS_V1_1)
-			values[i++] = Int64GetDatumFast(tmp.local_blks_dirtied * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.local_blks_written * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.temp_blks_read * unit_multiplier);
-		values[i++] = Int64GetDatumFast(tmp.temp_blks_written * unit_multiplier);
+			values[i++] = ReportUnitSize(api_version,tmp.local_blks_dirtied);
+		values[i++] = ReportUnitSize(api_version,tmp.local_blks_written);
+		values[i++] = ReportUnitSize(api_version,tmp.temp_blks_read);
+		values[i++] = ReportUnitSize(api_version,tmp.temp_blks_written);
 		if (api_version >= PGSS_V1_1)
 		{
 			values[i++] = Float8GetDatumFast(tmp.blk_read_time);
@@ -1799,7 +1812,6 @@ pg_stat_statements_internal(FunctionCallInfo fcinfo,
 		}
 		if (api_version >= PGSS_V1_8)
 		{
-			char		buf[256];
 			Datum		wal_bytes;
 
 			values[i++] = Int64GetDatumFast(tmp.wal_records);
