@@ -442,6 +442,9 @@ transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt)
 		qry->hasModifyingCTE = pstate->p_hasModifyingCTE;
 	}
 
+	/* copy the forceFkOverride flag */
+	qry->forceFkOverride = stmt->forceFkOverride;
+
 	/* set up range table with just the result rel */
 	qry->resultRelation = setTargetTable(pstate, stmt->relation,
 										 stmt->relation->inh,

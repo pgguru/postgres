@@ -82,6 +82,8 @@ static TupleTableSlot *ExecPrepareTupleRouting(ModifyTableState *mtstate,
 											   TupleTableSlot *slot,
 											   ResultRelInfo **partRelInfo);
 
+extern int force_fk_override;
+
 /*
  * Verify that the tuples to be produced by INSERT match the
  * target relation's rowtype
@@ -1359,6 +1361,9 @@ ldelete:;
 		 */
 		ar_delete_trig_tcs = NULL;
 	}
+
+	/* set force cascade flag */
+	force_fk_override = mtstate->forceFkOverride;
 
 	/* AFTER ROW DELETE Triggers */
 	ExecARDeleteTriggers(estate, resultRelInfo, tupleid, oldtuple,
@@ -2731,6 +2736,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	mtstate->operation = operation;
 	mtstate->canSetTag = node->canSetTag;
 	mtstate->mt_done = false;
+	mtstate->forceFkOverride = node->forceFkOverride;
 
 	mtstate->mt_nrels = nrels;
 	mtstate->resultRelInfo = (ResultRelInfo *)

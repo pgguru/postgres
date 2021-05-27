@@ -216,6 +216,18 @@ UPDATE PKTABLE SET ptest1=0 WHERE ptest1=4;
 -- Check PKTABLE for updates
 SELECT * FROM PKTABLE;
 
+-- Delete without cascade (should fail)
+DELETE FROM PKTABLE WHERE ptest1=1;
+
+-- Delete with cascade (should succeed)
+DELETE CASCADE FROM PKTABLE WHERE ptest1=1;
+
+-- Check PKTABLE for updates
+SELECT * FROM PKTABLE;
+
+-- Check FKTABLE for updates
+SELECT * FROM FKTABLE;
+
 DROP TABLE FKTABLE;
 DROP TABLE PKTABLE;
 
@@ -1829,3 +1841,93 @@ UPDATE fkpart10.tbl1 SET f1 = 2 WHERE f1 = 1;
 INSERT INTO fkpart10.tbl1 VALUES (0), (1);
 COMMIT;
 DROP SCHEMA fkpart10 CASCADE;
+
+-- test DELETE CASCADE and DELETE RESTRICT
+CREATE ROLE role_a;
+CREATE ROLE role_b;
+
+GRANT CREATE ON DATABASE regression TO role_a;
+
+SET SESSION AUTHORIZATION role_a;
+
+CREATE SCHEMA fkoverride;
+GRANT USAGE ON SCHEMA fkoverride TO role_b;
+
+SET search_path TO fkoverride;
+
+CREATE TABLE pk_1 (
+    id serial primary key,
+    val text
+);
+
+CREATE TABLE fk_1 (
+    id serial primary key,
+    val text,
+    pk_1_id int references pk_1 (id) ON DELETE RESTRICT
+);
+
+CREATE TABLE pk_2 (
+    id serial primary key,
+    val text
+);
+
+CREATE TABLE fk_2 (
+    id serial primary key,
+    val text,
+    pk_2_id int references pk_2 (id) ON DELETE CASCADE
+);
+
+INSERT INTO pk_1 VALUES (1, 'a'), (2,'b'), (3, 'c');
+INSERT INTO fk_1 (pk_1_id, val) VALUES (1, 'c'), (1, 'd'), (2, 'e'), (2, 'f'), (3, 'g');
+
+INSERT INTO pk_2 VALUES (1, 'a'), (2,'b'), (3, 'c');
+INSERT INTO fk_2 (pk_2_id, val) VALUES (1, 'c'), (1, 'd'), (2, 'e'), (2, 'f'), (3, 'g');
+
+GRANT SELECT, DELETE ON TABLE pk_1, pk_2 TO role_b;
+GRANT SELECT ON TABLE fk_1, fk_2 TO role_b;
+REVOKE DELETE ON TABLE fk_1, fk_2 FROM role_b;
+
+SET SESSION AUTHORIZATION role_b;
+SET search_path TO fkoverride;
+
+TABLE pk_1;
+TABLE fk_1;
+
+TABLE pk_2;
+TABLE fk_2;
+
+-- These should both fail, because role_b does not have DELETE permissions
+DELETE FROM fk_1 WHERE id = 1;
+DELETE FROM fk_2 WHERE id = 1;
+
+TABLE pk_1;
+TABLE fk_1;
+
+TABLE pk_2;
+TABLE fk_2;
+
+-- Failure/success here will be the basic constraints definition defaults, including permissions, etc
+DELETE FROM pk_1 WHERE id = 1;
+DELETE FROM pk_2 WHERE id = 1;
+
+-- DELETE CASCADE should treat existing constraints as CASCADE
+DELETE CASCADE FROM pk_1 WHERE id = 2;
+DELETE CASCADE FROM pk_2 WHERE id = 2;
+
+TABLE pk_1;
+TABLE fk_1;
+
+TABLE pk_2;
+TABLE fk_2;
+
+-- DELETE RESTRICT should treat existing constraints as RESTRICT, so should fail to remove either of these records
+DELETE RESTRICT FROM pk_1 WHERE id = 3;
+DELETE RESTRICT FROM pk_2 WHERE id = 3;
+
+RESET SESSION AUTHORIZATION;
+
+DROP SCHEMA fkoverride CASCADE;
+
+REVOKE CREATE ON DATABASE regression FROM role_a;
+DROP ROLE role_a;
+DROP ROLE role_b;

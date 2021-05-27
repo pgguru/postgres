@@ -1852,6 +1852,7 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 										parse->resultRelation,
 										rootRelation,
 										root->partColsUpdated,
+										parse->forceFkOverride,
 										resultRelations,
 										updateColnosLists,
 										withCheckOptionLists,

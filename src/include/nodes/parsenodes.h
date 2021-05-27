@@ -142,6 +142,8 @@ typedef struct Query
 
 	bool		isReturn;		/* is a RETURN statement */
 
+	int		forceFkOverride;	/* do we need to force override of fk type */
+
 	List	   *cteList;		/* WITH list (of CommonTableExpr's) */
 
 	List	   *rtable;			/* list of range table entries */
@@ -1598,6 +1600,7 @@ typedef struct DeleteStmt
 	Node	   *whereClause;	/* qualifications */
 	List	   *returningList;	/* list of expressions to return */
 	WithClause *withClause;		/* WITH clause */
+	int	   forceFkOverride;	/* do we need to force override of fk type */
 } DeleteStmt;
 
 /* ----------------------
@@ -2244,6 +2247,11 @@ typedef enum ConstrType			/* types of constraints */
 #define FKCONSTR_MATCH_FULL			'f'
 #define FKCONSTR_MATCH_PARTIAL		'p'
 #define FKCONSTR_MATCH_SIMPLE		's'
+
+/* Foreign key constraint overrides */
+#define FKCONSTR_OVERRIDE_NORMAL	0
+#define FKCONSTR_OVERRIDE_CASCADE	1
+#define FKCONSTR_OVERRIDE_RESTRICT	2
 
 typedef struct Constraint
 {

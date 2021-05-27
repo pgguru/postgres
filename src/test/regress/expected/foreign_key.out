@@ -339,6 +339,30 @@ SELECT * FROM PKTABLE;
       0 | Test4
 (4 rows)
 
+-- Delete without cascade (should fail)
+DELETE FROM PKTABLE WHERE ptest1=1;
+ERROR:  update or delete on table "pktable" violates foreign key constraint "fktable_ftest1_fkey" on table "fktable"
+DETAIL:  Key (ptest1)=(1) is still referenced from table "fktable".
+-- Delete with cascade (should succeed)
+DELETE CASCADE FROM PKTABLE WHERE ptest1=1;
+-- Check PKTABLE for updates
+SELECT * FROM PKTABLE;
+ ptest1 | ptest2 
+--------+--------
+      2 | Test2
+      3 | Test3
+      0 | Test4
+(3 rows)
+
+-- Check FKTABLE for updates
+SELECT * FROM FKTABLE;
+ ftest1 | ftest2 
+--------+--------
+      2 |      3
+      3 |      4
+        |      1
+(3 rows)
+
 DROP TABLE FKTABLE;
 DROP TABLE PKTABLE;
 --
@@ -2566,3 +2590,167 @@ DROP SCHEMA fkpart10 CASCADE;
 NOTICE:  drop cascades to 2 other objects
 DETAIL:  drop cascades to table fkpart10.tbl1
 drop cascades to table fkpart10.tbl2
+-- test DELETE CASCADE and DELETE RESTRICT
+CREATE ROLE role_a;
+CREATE ROLE role_b;
+GRANT CREATE ON DATABASE regression TO role_a;
+SET SESSION AUTHORIZATION role_a;
+CREATE SCHEMA fkoverride;
+GRANT USAGE ON SCHEMA fkoverride TO role_b;
+SET search_path TO fkoverride;
+CREATE TABLE pk_1 (
+    id serial primary key,
+    val text
+);
+CREATE TABLE fk_1 (
+    id serial primary key,
+    val text,
+    pk_1_id int references pk_1 (id) ON DELETE RESTRICT
+);
+CREATE TABLE pk_2 (
+    id serial primary key,
+    val text
+);
+CREATE TABLE fk_2 (
+    id serial primary key,
+    val text,
+    pk_2_id int references pk_2 (id) ON DELETE CASCADE
+);
+INSERT INTO pk_1 VALUES (1, 'a'), (2,'b'), (3, 'c');
+INSERT INTO fk_1 (pk_1_id, val) VALUES (1, 'c'), (1, 'd'), (2, 'e'), (2, 'f'), (3, 'g');
+INSERT INTO pk_2 VALUES (1, 'a'), (2,'b'), (3, 'c');
+INSERT INTO fk_2 (pk_2_id, val) VALUES (1, 'c'), (1, 'd'), (2, 'e'), (2, 'f'), (3, 'g');
+GRANT SELECT, DELETE ON TABLE pk_1, pk_2 TO role_b;
+GRANT SELECT ON TABLE fk_1, fk_2 TO role_b;
+REVOKE DELETE ON TABLE fk_1, fk_2 FROM role_b;
+SET SESSION AUTHORIZATION role_b;
+SET search_path TO fkoverride;
+TABLE pk_1;
+ id | val 
+----+-----
+  1 | a
+  2 | b
+  3 | c
+(3 rows)
+
+TABLE fk_1;
+ id | val | pk_1_id 
+----+-----+---------
+  1 | c   |       1
+  2 | d   |       1
+  3 | e   |       2
+  4 | f   |       2
+  5 | g   |       3
+(5 rows)
+
+TABLE pk_2;
+ id | val 
+----+-----
+  1 | a
+  2 | b
+  3 | c
+(3 rows)
+
+TABLE fk_2;
+ id | val | pk_2_id 
+----+-----+---------
+  1 | c   |       1
+  2 | d   |       1
+  3 | e   |       2
+  4 | f   |       2
+  5 | g   |       3
+(5 rows)
+
+-- These should both fail, because role_b does not have DELETE permissions
+DELETE FROM fk_1 WHERE id = 1;
+ERROR:  permission denied for table fk_1
+DELETE FROM fk_2 WHERE id = 1;
+ERROR:  permission denied for table fk_2
+TABLE pk_1;
+ id | val 
+----+-----
+  1 | a
+  2 | b
+  3 | c
+(3 rows)
+
+TABLE fk_1;
+ id | val | pk_1_id 
+----+-----+---------
+  1 | c   |       1
+  2 | d   |       1
+  3 | e   |       2
+  4 | f   |       2
+  5 | g   |       3
+(5 rows)
+
+TABLE pk_2;
+ id | val 
+----+-----
+  1 | a
+  2 | b
+  3 | c
+(3 rows)
+
+TABLE fk_2;
+ id | val | pk_2_id 
+----+-----+---------
+  1 | c   |       1
+  2 | d   |       1
+  3 | e   |       2
+  4 | f   |       2
+  5 | g   |       3
+(5 rows)
+
+-- Failure/success here will be the basic constraints definition defaults, including permissions, etc
+DELETE FROM pk_1 WHERE id = 1;
+ERROR:  update or delete on table "pk_1" violates foreign key constraint "fk_1_pk_1_id_fkey" on table "fk_1"
+DETAIL:  Key (id)=(1) is still referenced from table "fk_1".
+DELETE FROM pk_2 WHERE id = 1;
+-- DELETE CASCADE should treat existing constraints as CASCADE
+DELETE CASCADE FROM pk_1 WHERE id = 2;
+DELETE CASCADE FROM pk_2 WHERE id = 2;
+TABLE pk_1;
+ id | val 
+----+-----
+  1 | a
+  3 | c
+(2 rows)
+
+TABLE fk_1;
+ id | val | pk_1_id 
+----+-----+---------
+  1 | c   |       1
+  2 | d   |       1
+  5 | g   |       3
+(3 rows)
+
+TABLE pk_2;
+ id | val 
+----+-----
+  3 | c
+(1 row)
+
+TABLE fk_2;
+ id | val | pk_2_id 
+----+-----+---------
+  5 | g   |       3
+(1 row)
+
+-- DELETE RESTRICT should treat existing constraints as RESTRICT, so should fail to remove either of these records
+DELETE RESTRICT FROM pk_1 WHERE id = 3;
+ERROR:  update or delete on table "pk_1" violates foreign key constraint "fk_1_pk_1_id_fkey" on table "fk_1"
+DETAIL:  Key (id)=(3) is still referenced from table "fk_1".
+DELETE RESTRICT FROM pk_2 WHERE id = 3;
+ERROR:  update or delete on table "pk_2" violates foreign key constraint "fk_2_pk_2_id_fkey" on table "fk_2"
+DETAIL:  Key (id)=(3) is still referenced from table "fk_2".
+RESET SESSION AUTHORIZATION;
+DROP SCHEMA fkoverride CASCADE;
+NOTICE:  drop cascades to 4 other objects
+DETAIL:  drop cascades to table pk_1
+drop cascades to table fk_1
+drop cascades to table pk_2
+drop cascades to table fk_2
+REVOKE CREATE ON DATABASE regression FROM role_a;
+DROP ROLE role_a;
+DROP ROLE role_b;

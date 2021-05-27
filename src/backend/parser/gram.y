@@ -466,6 +466,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <str>		unicode_normal_form
 
 %type <boolean> opt_instead
+%type <ival>	opt_fk_override
 %type <boolean> opt_unique opt_concurrently opt_verbose opt_full
 %type <boolean> opt_freeze opt_analyze opt_default opt_recheck
 %type <defelt>	opt_binary copy_delimiter
@@ -11117,15 +11118,17 @@ returning_clause:
  *
  *****************************************************************************/
 
-DeleteStmt: opt_with_clause DELETE_P FROM relation_expr_opt_alias
+DeleteStmt:
+			opt_with_clause DELETE_P opt_fk_override FROM relation_expr_opt_alias
 			using_clause where_or_current_clause returning_clause
 				{
 					DeleteStmt *n = makeNode(DeleteStmt);
-					n->relation = $4;
-					n->usingClause = $5;
-					n->whereClause = $6;
-					n->returningList = $7;
+					n->relation = $5;
+					n->usingClause = $6;
+					n->whereClause = $7;
+					n->returningList = $8;
 					n->withClause = $1;
+					n->forceFkOverride = $3;
 					$$ = (Node *)n;
 				}
 		;
@@ -11133,6 +11136,12 @@ DeleteStmt: opt_with_clause DELETE_P FROM relation_expr_opt_alias
 using_clause:
 				USING from_list						{ $$ = $2; }
 			| /*EMPTY*/								{ $$ = NIL; }
+		;
+
+opt_fk_override:
+				CASCADE								{ $$ = FKCONSTR_OVERRIDE_CASCADE; }
+			|	RESTRICT							{ $$ = FKCONSTR_OVERRIDE_RESTRICT; }
+			| /*EMPTY*/								{ $$ = FKCONSTR_OVERRIDE_NORMAL; }
 		;
 
 
