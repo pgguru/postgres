@@ -3629,6 +3629,7 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 						CmdType operation, bool canSetTag,
 						Index nominalRelation, Index rootRelation,
 						bool partColsUpdated,
+						bool forceCascade,
 						List *resultRelations,
 						List *updateColnosLists,
 						List *withCheckOptionLists, List *returningLists,
@@ -3644,6 +3645,7 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 		   list_length(resultRelations) == list_length(withCheckOptionLists));
 	Assert(returningLists == NIL ||
 		   list_length(resultRelations) == list_length(returningLists));
+	Assert(operation == CMD_DELETE || !forceCascade);
 
 	pathnode->path.pathtype = T_ModifyTable;
 	pathnode->path.parent = rel;
@@ -3655,6 +3657,8 @@ create_modifytable_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->path.parallel_safe = false;
 	pathnode->path.parallel_workers = 0;
 	pathnode->path.pathkeys = NIL;
+	/* copy forceCascade flag */
+	pathnode->forceCascade = forceCascade;
 
 	/*
 	 * Compute cost & rowcount as subpath cost & rowcount (if RETURNING)
