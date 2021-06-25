@@ -25,6 +25,7 @@
 #include "access/xlog_internal.h"
 #include "catalog/pg_control.h"
 #include "common/controldata_utils.h"
+#include "common/kmgr_utils.h"
 #include "common/logging.h"
 #include "common/pagefeat.h"
 #include "getopt_long.h"
@@ -336,5 +337,7 @@ main(int argc, char *argv[])
 		   ? _("64-bit") :
 		   PageFeatureSetHasFeature(ControlFile->page_features, PF_PAGE_CHECKSUMS32) \
 		   ? _("32-bit") : _("no"));
+	printf(_("File encryption method:               %s\n"),
+		   encryption_methods[ControlFile->file_encryption_method].name);
 	return 0;
 }
