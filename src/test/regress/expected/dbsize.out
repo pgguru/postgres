@@ -114,10 +114,6 @@ SELECT pg_size_bytes('1 AB A    ');
 ERROR:  invalid size: "1 AB A    "
 DETAIL:  Invalid size unit: "AB A".
 HINT:  Valid units are "bytes", "kB", "MB", "GB", and "TB".
-SELECT pg_size_bytes('9223372036854775807.9');
-ERROR:  bigint out of range
-SELECT pg_size_bytes('1e100');
-ERROR:  bigint out of range
 SELECT pg_size_bytes('1e1000000000000000000');
 ERROR:  value overflows numeric format
 SELECT pg_size_bytes('1 byte');  -- the singular "byte" is not supported

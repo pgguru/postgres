@@ -34,8 +34,6 @@ SELECT size, pg_size_bytes(size) FROM
 SELECT pg_size_bytes('1 AB');
 SELECT pg_size_bytes('1 AB A');
 SELECT pg_size_bytes('1 AB A    ');
-SELECT pg_size_bytes('9223372036854775807.9');
-SELECT pg_size_bytes('1e100');
 SELECT pg_size_bytes('1e1000000000000000000');
 SELECT pg_size_bytes('1 byte');  -- the singular "byte" is not supported
 SELECT pg_size_bytes('');

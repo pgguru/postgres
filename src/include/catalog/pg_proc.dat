@@ -7187,7 +7187,7 @@
   prosrc => 'pg_size_pretty_numeric' },
 { oid => '3334',
   descr => 'convert a size in human-readable format with size units into bytes',
-  proname => 'pg_size_bytes', prorettype => 'int8', proargtypes => 'text',
+  proname => 'pg_size_bytes', prorettype => 'numeric', proargtypes => 'text',
   prosrc => 'pg_size_bytes' },
 { oid => '2997',
   descr => 'disk space usage for the specified table, including TOAST, free space and visibility map',

@@ -638,7 +638,7 @@ pg_size_pretty_numeric(PG_FUNCTION_ARGS)
 	Numeric		size = PG_GETARG_NUMERIC(0);
 	Numeric		limit,
 				limit2;
-	char	   *result;
+	char	   *result = NULL;
 
 	limit = int64_to_numeric(10 * 1024);
 	limit2 = int64_to_numeric(10 * 1024 * 2 - 1);
@@ -660,30 +660,31 @@ pg_size_pretty_numeric(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			/* size >>= 10 */
-			size = numeric_shift_right(size, 10);
-			if (numeric_is_less(numeric_absolute(size), limit2))
-			{
-				size = numeric_half_rounded(size);
-				result = psprintf("%s MB", numeric_to_cstring(size));
-			}
-			else
-			{
+			int idx, max_iter = 2; /* highest index of table_below */
+			char *output_formats[] = {
+				"%s MB",
+				"%s GB",
+				"%s TB"
+			};
+
+			for (idx = 0; idx < max_iter; idx++) {
 				/* size >>= 10 */
 				size = numeric_shift_right(size, 10);
-
 				if (numeric_is_less(numeric_absolute(size), limit2))
 				{
 					size = numeric_half_rounded(size);
-					result = psprintf("%s GB", numeric_to_cstring(size));
+					result = psprintf(output_formats[idx], numeric_to_cstring(size));
+					break;
 				}
-				else
-				{
-					/* size >>= 10 */
-					size = numeric_shift_right(size, 10);
-					size = numeric_half_rounded(size);
-					result = psprintf("%s TB", numeric_to_cstring(size));
-				}
+			}
+
+			if (!result) {
+				/* this uses the last format in the table above for anything else */
+
+				/* size >>= 10 */
+				size = numeric_shift_right(size, 10);
+				size = numeric_half_rounded(size);
+				result = psprintf(output_formats[max_iter], numeric_to_cstring(size));
 			}
 		}
 	}
@@ -703,7 +704,6 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 			   *endptr;
 	char		saved_char;
 	Numeric		num;
-	int64		result;
 	bool		have_digits = false;
 
 	str = text_to_cstring(arg);
@@ -786,7 +786,16 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 	/* Handle possible unit */
 	if (*strptr != '\0')
 	{
-		int64		multiplier = 0;
+		int64		multiplier = 1;
+		int         i;
+		int         unit_count = 5; /* sizeof units table */
+		char       *units[] = {
+			"bytes",
+			"kb",
+			"mb",
+			"gb",
+			"tb",
+		};
 
 		/* Trim any trailing whitespace */
 		endptr = str + VARSIZE_ANY_EXHDR(arg) - 1;
@@ -797,21 +806,20 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 		endptr++;
 		*endptr = '\0';
 
-		/* Parse the unit case-insensitively */
-		if (pg_strcasecmp(strptr, "bytes") == 0)
-			multiplier = (int64) 1;
-		else if (pg_strcasecmp(strptr, "kb") == 0)
-			multiplier = (int64) 1024;
-		else if (pg_strcasecmp(strptr, "mb") == 0)
-			multiplier = ((int64) 1024) * 1024;
+		for (i = 0; i < unit_count; i++) {
+			printf("strptr: %s units: %s", strptr, units[i]);
+			if (pg_strcasecmp(strptr, units[i]) == 0)
+				break;
+			/* 
+			 * Note: int64 isn't large enough to store the full multiplier
+			 * going past ~ 9EB, but since this is a fixed value, we can apply
+			 * it twice, thus storing use 2 ** 5 = 32 here, but 2 ** 10 = 1024
+			 * on actual conversion to numeric.
+			 */
+			multiplier *= 32;
+		}
 
-		else if (pg_strcasecmp(strptr, "gb") == 0)
-			multiplier = ((int64) 1024) * 1024 * 1024;
-
-		else if (pg_strcasecmp(strptr, "tb") == 0)
-			multiplier = ((int64) 1024) * 1024 * 1024 * 1024;
-
-		else
+		if (i == unit_count)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("invalid size: \"%s\"", text_to_cstring(arg)),
@@ -827,13 +835,19 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 			num = DatumGetNumeric(DirectFunctionCall2(numeric_mul,
 													  NumericGetDatum(mul_num),
 													  NumericGetDatum(num)));
+
+			/* second application to get around int64 limitations in unit multipliers */
+			num = DatumGetNumeric(DirectFunctionCall2(numeric_mul,
+													  NumericGetDatum(mul_num),
+													  NumericGetDatum(num)));
 		}
 	}
 
-	result = DatumGetInt64(DirectFunctionCall1(numeric_int8,
-											   NumericGetDatum(num)));
+	/* now finally truncate, since this is always in integer-like units */
+	num = DatumGetNumeric(DirectFunctionCall1(numeric_ceil,
+											  NumericGetDatum(num)));
 
-	PG_RETURN_INT64(result);
+	PG_RETURN_NUMERIC(num);
 }
 
 /*
