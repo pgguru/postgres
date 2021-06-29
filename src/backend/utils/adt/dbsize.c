@@ -660,11 +660,15 @@ pg_size_pretty_numeric(PG_FUNCTION_ARGS)
 		}
 		else
 		{
-			int idx, max_iter = 2; /* highest index of table_below */
+			int idx, max_iter = 6; /* highest index of table_below */
 			char *output_formats[] = {
 				"%s MB",
 				"%s GB",
-				"%s TB"
+				"%s TB",
+				"%s PB",
+				"%s EB",
+				"%s ZB",
+				"%s YB"
 			};
 
 			for (idx = 0; idx < max_iter; idx++) {
@@ -755,8 +759,9 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 		char	   *cp;
 
 		/*
-		 * Note we might one day support EB units, so if what follows 'E'
-		 * isn't a number, just treat it all as a unit to be parsed.
+		 * If what follows 'e' isn't a number, we just treat it all as a unit
+		 * to be parsed; this allows us to support both exponential notation
+		 * and EB units.
 		 */
 		exponent = strtol(endptr + 1, &cp, 10);
 		(void) exponent;		/* Silence -Wunused-result warnings */
@@ -788,13 +793,17 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 	{
 		int64		multiplier = 1;
 		int         i;
-		int         unit_count = 5; /* sizeof units table */
+		int         unit_count = 9; /* sizeof units table */
 		char       *units[] = {
 			"bytes",
 			"kb",
 			"mb",
 			"gb",
 			"tb",
+			"pb",
+			"eb",
+			"zb",
+			"yb",
 		};
 
 		/* Trim any trailing whitespace */
@@ -824,7 +833,8 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("invalid size: \"%s\"", text_to_cstring(arg)),
 					 errdetail("Invalid size unit: \"%s\".", strptr),
-					 errhint("Valid units are \"bytes\", \"kB\", \"MB\", \"GB\", and \"TB\".")));
+					 errhint("Valid units are \"bytes\", \"kB\", \"MB\", \"GB\", \"TB\", "
+						 "\"PB\", \"EB\", \"ZB\", and \"YB\".")));
 
 		if (multiplier > 1)
 		{
