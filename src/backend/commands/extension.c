@@ -1688,6 +1688,11 @@ CreateExtension(ParseState *pstate, CreateExtensionStmt *stmt)
 	bool		cascade = false;
 	ListCell   *lc;
 
+	if (!has_privs_of_role(GetUserId(), ROLE_PG_CREATE_EXTENSIONS))
+		ereport(ERROR,
+				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+				 errmsg("permission denied for CREATE EXTENSION")));
+
 	/* Check extension name validity before any filesystem access */
 	check_valid_extension_name(stmt->extname);
 

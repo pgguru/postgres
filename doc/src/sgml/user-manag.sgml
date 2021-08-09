@@ -581,6 +581,11 @@ DROP ROLE doomed_role;
        <entry>Allow executing programs on the database server as the user the database runs as with
        COPY and other functions which allow executing a server-side program.</entry>
       </row>
+      <row>
+       <entry>pg_create_extensions</entry>
+       <entry>Allows the user to use the <command>CREATE EXTENSION</command> command; normal
+        superuser/trusted extension constraints still apply.</entry>
+      </row>
      </tbody>
     </tgroup>
    </table>
