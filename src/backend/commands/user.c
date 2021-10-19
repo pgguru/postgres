@@ -304,11 +304,24 @@ CreateRole(ParseState *pstate, CreateRoleStmt *stmt)
 	pg_authid_rel = table_open(AuthIdRelationId, RowExclusiveLock);
 	pg_authid_dsc = RelationGetDescr(pg_authid_rel);
 
-	if (OidIsValid(get_role_oid(stmt->role, true)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("role \"%s\" already exists",
-						stmt->role)));
+	roleid = get_role_oid(stmt->role, true);
+
+	if (OidIsValid(roleid))
+	{
+		if (stmt->if_not_exists)
+		{
+			table_close(pg_authid_rel, NoLock);
+			ereport(NOTICE,
+					(errmsg("role \"%s\" already exists, skipping",
+							stmt->role)));
+			return roleid;
+		}
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_DUPLICATE_OBJECT),
+					 errmsg("role \"%s\" already exists",
+							stmt->role)));
+	}
 
 	/* Convert validuntil to internal form */
 	if (validUntil)

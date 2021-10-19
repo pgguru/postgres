@@ -2622,6 +2622,7 @@ typedef struct CreateRoleStmt
 	RoleStmtType stmt_type;		/* ROLE/USER/GROUP */
 	char	   *role;			/* role name */
 	List	   *options;		/* List of DefElem nodes */
+	bool       if_not_exists;	/* Skip role creation if exists */
 } CreateRoleStmt;
 
 typedef struct AlterRoleStmt

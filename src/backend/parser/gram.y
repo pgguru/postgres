@@ -1055,12 +1055,22 @@ CallStmt:	CALL func_application
  *****************************************************************************/
 
 CreateRoleStmt:
-			CREATE ROLE RoleId opt_with OptRoleList
+			CREATE ROLE IF_P NOT EXISTS RoleId opt_with OptRoleList
+				{
+					CreateRoleStmt *n = makeNode(CreateRoleStmt);
+					n->stmt_type = ROLESTMT_ROLE;
+					n->role = $6;
+					n->options = $8;
+					n->if_not_exists = true;
+					$$ = (Node *)n;
+				}
+			| CREATE ROLE RoleId opt_with OptRoleList
 				{
 					CreateRoleStmt *n = makeNode(CreateRoleStmt);
 					n->stmt_type = ROLESTMT_ROLE;
 					n->role = $3;
 					n->options = $5;
+					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
 		;
@@ -1211,12 +1221,22 @@ CreateOptRoleElem:
  *****************************************************************************/
 
 CreateUserStmt:
-			CREATE USER RoleId opt_with OptRoleList
+			CREATE USER IF_P NOT EXISTS RoleId opt_with OptRoleList
+				{
+					CreateRoleStmt *n = makeNode(CreateRoleStmt);
+					n->stmt_type = ROLESTMT_USER;
+					n->role = $6;
+					n->options = $8;
+					n->if_not_exists = true;
+					$$ = (Node *)n;
+				}
+			| CREATE USER RoleId opt_with OptRoleList
 				{
 					CreateRoleStmt *n = makeNode(CreateRoleStmt);
 					n->stmt_type = ROLESTMT_USER;
 					n->role = $3;
 					n->options = $5;
+					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
 		;
@@ -1350,12 +1370,22 @@ DropRoleStmt:
  *****************************************************************************/
 
 CreateGroupStmt:
-			CREATE GROUP_P RoleId opt_with OptRoleList
+			CREATE GROUP_P IF_P NOT EXISTS RoleId opt_with OptRoleList
+				{
+					CreateRoleStmt *n = makeNode(CreateRoleStmt);
+					n->stmt_type = ROLESTMT_GROUP;
+					n->role = $6;
+					n->options = $8;
+					n->if_not_exists = true;
+					$$ = (Node *)n;
+				}
+			| CREATE GROUP_P RoleId opt_with OptRoleList
 				{
 					CreateRoleStmt *n = makeNode(CreateRoleStmt);
 					n->stmt_type = ROLESTMT_GROUP;
 					n->role = $3;
 					n->options = $5;
+					n->if_not_exists = false;
 					$$ = (Node *)n;
 				}
 		;
