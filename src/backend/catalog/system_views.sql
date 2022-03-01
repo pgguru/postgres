@@ -977,7 +977,8 @@ CREATE VIEW pg_stat_gssapi AS
             S.pid,
             S.gss_auth AS gss_authenticated,
             S.gss_princ AS principal,
-            S.gss_enc AS encrypted
+            S.gss_enc AS encrypted,
+            S.gss_proxy AS credentials_proxied
     FROM pg_stat_get_activity(NULL) AS S
     WHERE S.client_port IS NOT NULL;
 

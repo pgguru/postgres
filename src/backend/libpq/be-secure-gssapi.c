@@ -497,12 +497,16 @@ secure_open_gssapi(Port *port)
 	bool		complete_next = false;
 	OM_uint32	major,
 				minor;
+	gss_cred_id_t	proxy;
 
 	/*
 	 * Allocate subsidiary Port data for GSSAPI operations.
 	 */
 	port->gss = (pg_gssinfo *)
 		MemoryContextAllocZero(TopMemoryContext, sizeof(pg_gssinfo));
+
+	proxy = NULL;
+	port->gss->proxy_creds = false;
 
 	/*
 	 * Allocate buffers and initialize state variables.  By malloc'ing the
@@ -588,7 +592,8 @@ secure_open_gssapi(Port *port)
 									   GSS_C_NO_CREDENTIAL, &input,
 									   GSS_C_NO_CHANNEL_BINDINGS,
 									   &port->gss->name, NULL, &output, NULL,
-									   NULL, NULL);
+									   NULL, pg_gss_accept_deleg ? &proxy : NULL);
+
 		if (GSS_ERROR(major))
 		{
 			pg_GSS_error(_("could not accept GSSAPI security context"),
@@ -603,6 +608,12 @@ secure_open_gssapi(Port *port)
 			 * both with and without a packet to be sent.
 			 */
 			complete_next = true;
+		}
+
+		if (proxy != NULL)
+		{
+			pg_store_proxy_credential(proxy);
+			port->gss->proxy_creds = true;
 		}
 
 		/* Done handling the incoming packet, reset our buffer */
@@ -730,4 +741,17 @@ be_gssapi_get_princ(Port *port)
 		return NULL;
 
 	return port->gss->princ;
+}
+
+/*
+ * Return if GSSAPI delegated/proxy credentials were included on this
+ * connection.
+ */
+bool
+be_gssapi_get_proxy(Port *port)
+{
+	if (!port || !port->gss)
+		return NULL;
+
+	return port->gss->proxy_creds;
 }

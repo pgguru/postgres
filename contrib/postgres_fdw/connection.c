@@ -17,6 +17,7 @@
 #include "catalog/pg_user_mapping.h"
 #include "commands/defrem.h"
 #include "funcapi.h"
+#include "libpq/libpq-be.h"
 #include "libpq/libpq-be-fe-helpers.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
@@ -115,6 +116,8 @@ static void pgfdw_abort_cleanup(ConnCacheEntry *entry, bool toplevel);
 static void pgfdw_finish_pre_commit_cleanup(List *pending_entries);
 static void pgfdw_finish_pre_subcommit_cleanup(List *pending_entries,
 											   int curlevel);
+static void pgfdw_security_check(const char **keywords, const char **values,
+								 UserMapping *user, PGconn *conn);
 static bool UserMappingPasswordRequired(UserMapping *user);
 static bool disconnect_cached_connections(Oid serverid);
 
@@ -348,6 +351,45 @@ make_new_connection(ConnCacheEntry *entry, UserMapping *user)
 }
 
 /*
+ * Check that non-superuser has used password or proxied credentials
+ * to establish connection; otherwise, he's piggybacking on the
+ * postgres server's user identity. See also dblink_security_check()
+ * in contrib/dblink and check_conn_params.
+ */
+static void
+pgfdw_security_check(const char **keywords, const char **values, UserMapping *user, PGconn *conn)
+{
+	/* Superusers bypass the check */
+	if (superuser_arg(user->userid))
+		return;
+
+	/* Connected via GSSAPI with proxied credentials- all good. */
+	if (PQconnectionUsedGSSAPI(conn) && be_gssapi_get_proxy(MyProcPort))
+		return;
+
+	/* Ok if superuser set PW required false. */
+	if (!UserMappingPasswordRequired(user))
+		return;
+
+	/* Connected via PW, with PW required true, and provided non-empty PW. */
+	if (PQconnectionUsedPassword(conn) && UserMappingPasswordRequired(user))
+	{
+		/* ok if params contain a non-empty password */
+		for (int i = 0; keywords[i] != NULL; i++)
+		{
+			if (strcmp(keywords[i], "password") == 0 && values[i][0] != '\0')
+				return;
+		}
+	}
+
+	ereport(ERROR,
+			(errcode(ERRCODE_S_R_E_PROHIBITED_SQL_STATEMENT_ATTEMPTED),
+			 errmsg("password or gssapi proxied credentials required"),
+			 errdetail("Non-superuser cannot connect if the server does not request a password or use gssapi with proxied credentials."),
+			 errhint("Target server's authentication method must be changed or password_required=false set in the user mapping attributes.")));
+}
+
+/*
  * Connect to remote server using specified server and user mapping properties.
  */
 static PGconn *
@@ -458,19 +500,8 @@ connect_pg_server(ForeignServer *server, UserMapping *user)
 							server->servername),
 					 errdetail_internal("%s", pchomp(PQerrorMessage(conn)))));
 
-		/*
-		 * Check that non-superuser has used password to establish connection;
-		 * otherwise, he's piggybacking on the postgres server's user
-		 * identity. See also dblink_security_check() in contrib/dblink and
-		 * check_conn_params.
-		 */
-		if (!superuser_arg(user->userid) && UserMappingPasswordRequired(user) &&
-			!PQconnectionUsedPassword(conn))
-			ereport(ERROR,
-					(errcode(ERRCODE_S_R_E_PROHIBITED_SQL_STATEMENT_ATTEMPTED),
-					 errmsg("password is required"),
-					 errdetail("Non-superuser cannot connect if the server does not request a password."),
-					 errhint("Target server's authentication method must be changed or password_required=false set in the user mapping attributes.")));
+		/* Perform post-connection security checks */
+		pgfdw_security_check(keywords, values, user, conn);
 
 		/* Prepare new session for use */
 		configure_remote_session(conn);
@@ -524,7 +555,8 @@ UserMappingPasswordRequired(UserMapping *user)
 }
 
 /*
- * For non-superusers, insist that the connstr specify a password.  This
+ * For non-superusers, insist that the connstr specify a password or that the
+ * user provided their own GSSAPI proxied credentials.  This
  * prevents a password from being picked up from .pgpass, a service file, the
  * environment, etc.  We don't want the postgres user's passwords,
  * certificates, etc to be accessible to non-superusers.  (See also
@@ -537,6 +569,10 @@ check_conn_params(const char **keywords, const char **values, UserMapping *user)
 
 	/* no check required if superuser */
 	if (superuser_arg(user->userid))
+		return;
+
+	/* ok if the user provided their own proxied credentials */
+	if (be_gssapi_get_proxy(MyProcPort))
 		return;
 
 	/* ok if params contain a non-empty password */
@@ -552,8 +588,8 @@ check_conn_params(const char **keywords, const char **values, UserMapping *user)
 
 	ereport(ERROR,
 			(errcode(ERRCODE_S_R_E_PROHIBITED_SQL_STATEMENT_ATTEMPTED),
-			 errmsg("password is required"),
-			 errdetail("Non-superusers must provide a password in the user mapping.")));
+			 errmsg("password or gssapi proxied credentials required"),
+			 errdetail("Non-superusers must proxy gssapi credentials or provide a password in the user mapping.")));
 }
 
 /*

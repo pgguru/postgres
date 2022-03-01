@@ -165,6 +165,7 @@ static int	CheckCertAuth(Port *port);
  */
 char	   *pg_krb_server_keyfile;
 bool		pg_krb_caseins_users;
+bool		pg_gss_accept_deleg;
 
 
 /*----------------------------------------------------------------
@@ -918,6 +919,7 @@ pg_GSS_recvauth(Port *port)
 	int			mtype;
 	StringInfoData buf;
 	gss_buffer_desc gbuf;
+	gss_cred_id_t proxy;
 
 	/*
 	 * Use the configured keytab, if there is one.  Unfortunately, Heimdal
@@ -946,6 +948,9 @@ pg_GSS_recvauth(Port *port)
 	 * Initialize sequence with an empty context
 	 */
 	port->gss->ctx = GSS_C_NO_CONTEXT;
+
+	proxy = NULL;
+	port->gss->proxy_creds = false;
 
 	/*
 	 * Loop through GSSAPI message exchange. This exchange can consist of
@@ -997,7 +1002,7 @@ pg_GSS_recvauth(Port *port)
 										  &port->gss->outbuf,
 										  &gflags,
 										  NULL,
-										  NULL);
+										  pg_gss_accept_deleg ? &proxy : NULL);
 
 		/* gbuf no longer used */
 		pfree(buf.data);
@@ -1008,6 +1013,12 @@ pg_GSS_recvauth(Port *port)
 			 (unsigned int) port->gss->outbuf.length, gflags);
 
 		CHECK_FOR_INTERRUPTS();
+
+		if (proxy != NULL)
+		{
+			pg_store_proxy_credential(proxy);
+			port->gss->proxy_creds = true;
+		}
 
 		if (port->gss->outbuf.length != 0)
 		{

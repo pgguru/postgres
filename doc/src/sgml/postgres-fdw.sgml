@@ -170,8 +170,9 @@
    </para>
    <para>
     Only superusers may connect to foreign servers without password
-    authentication, so always specify the <literal>password</literal> option
-    for user mappings belonging to non-superusers.
+    authentication or using gssapi proxied credentials, so specify the
+    <literal>password</literal> option for user mappings belonging to
+    non-superusers who are not able to proxy GSSAPI credentials.
    </para>
    <para>
     A superuser may override this check on a per-user-mapping basis by setting
