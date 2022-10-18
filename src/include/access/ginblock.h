@@ -249,6 +249,7 @@ typedef signed char GinNullCategory;
 #define GinMaxItemSize \
 	Min(INDEX_SIZE_MASK, \
 		MAXALIGN_DOWN(((BLCKSZ - \
+						MaxSizeOfPageReservedSpace - \
 						MAXALIGN(SizeOfPageHeaderData + 3 * sizeof(ItemIdData)) - \
 						MAXALIGN(sizeof(GinPageOpaqueData))) / 3)))
 
@@ -319,6 +320,7 @@ typedef signed char GinNullCategory;
 
 #define GinDataPageMaxDataSize	\
 	(BLCKSZ - MAXALIGN(SizeOfPageHeaderData) \
+	 - MaxSizeOfPageReservedSpace \
 	 - MAXALIGN(sizeof(ItemPointerData)) \
 	 - MAXALIGN(sizeof(GinPageOpaqueData)))
 
@@ -326,7 +328,7 @@ typedef signed char GinNullCategory;
  * List pages
  */
 #define GinListPageSize  \
-	( BLCKSZ - SizeOfPageHeaderData - MAXALIGN(sizeof(GinPageOpaqueData)) )
+	( BLCKSZ - SizeOfPageHeaderData - MAXALIGN(sizeof(GinPageOpaqueData)) - MaxSizeOfPageReservedSpace)
 
 /*
  * A compressed posting list.

@@ -162,12 +162,12 @@ typedef struct BTMetaPageData
  * attribute, which we account for here.
  */
 #define BTMaxItemSize(page) \
-	(MAXALIGN_DOWN((PageGetPageSize(page) - \
+	(MAXALIGN_DOWN((PageGetPageSize(page) - SizeOfPageReservedSpace - \
 					MAXALIGN(SizeOfPageHeaderData + 3*sizeof(ItemIdData)) - \
 					MAXALIGN(sizeof(BTPageOpaqueData))) / 3) - \
 					MAXALIGN(sizeof(ItemPointerData)))
 #define BTMaxItemSizeNoHeapTid(page) \
-	MAXALIGN_DOWN((PageGetPageSize(page) - \
+	MAXALIGN_DOWN((PageGetPageSize(page) - SizeOfPageReservedSpace - \
 				   MAXALIGN(SizeOfPageHeaderData + 3*sizeof(ItemIdData)) - \
 				   MAXALIGN(sizeof(BTPageOpaqueData))) / 3)
 
@@ -181,10 +181,15 @@ typedef struct BTMetaPageData
  * heap TIDs must have to fill the space between the page header and
  * special area).  The value is slightly higher (i.e. more conservative)
  * than necessary as a result, which is considered acceptable.
+ *
+ * Since this is a fixed-size upper limit we restrict to the max size of page
+ * reserved space; this does mean that we pay a cost of
+ * (MaxSizeOfPageReservedSpace / sizeof(ItemPointerData)) less tuples stored
+ * on a page.
  */
 #define MaxTIDsPerBTreePage \
-	(int) ((BLCKSZ - SizeOfPageHeaderData - sizeof(BTPageOpaqueData)) / \
-		   sizeof(ItemPointerData))
+	(int) ((BLCKSZ - SizeOfPageHeaderData - MaxSizeOfPageReservedSpace - \
+			sizeof(BTPageOpaqueData)) / sizeof(ItemPointerData))
 
 /*
  * The leaf-page fillfactor defaults to 90% but is user-adjustable.

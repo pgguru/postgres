@@ -77,6 +77,7 @@
 #include "getopt_long.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
+#include "storage/bufpage.h" /* MaxSizeOfPageReservedSpace */
 
 
 /* Ideally this would be in a .h file, but it hardly seems worth the trouble */
