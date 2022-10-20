@@ -1565,8 +1565,8 @@ lazy_scan_prune(LVRelState *vacrel,
 	int			nnewlpdead;
 	TransactionId NewRelfrozenXid;
 	MultiXactId NewRelminMxid;
-	OffsetNumber deadoffsets[MaxHeapTuplesPerPage];
-	xl_heap_freeze_tuple frozen[MaxHeapTuplesPerPage];
+	OffsetNumber deadoffsets[MaxHeapTuplesPerPageLimit];
+	xl_heap_freeze_tuple frozen[MaxHeapTuplesPerPageLimit];
 
 	Assert(BufferGetBlockNumber(buf) == blkno);
 
@@ -1968,7 +1968,7 @@ lazy_scan_noprune(LVRelState *vacrel,
 	HeapTupleHeader tupleheader;
 	TransactionId NewRelfrozenXid = vacrel->NewRelfrozenXid;
 	MultiXactId NewRelminMxid = vacrel->NewRelminMxid;
-	OffsetNumber deadoffsets[MaxHeapTuplesPerPage];
+	OffsetNumber deadoffsets[MaxHeapTuplesPerPageLimit];
 
 	Assert(BufferGetBlockNumber(buf) == blkno);
 
@@ -2497,7 +2497,7 @@ lazy_vacuum_heap_page(LVRelState *vacrel, BlockNumber blkno, Buffer buffer,
 {
 	VacDeadItems *dead_items = vacrel->dead_items;
 	Page		page = BufferGetPage(buffer);
-	OffsetNumber unused[MaxHeapTuplesPerPage];
+	OffsetNumber unused[MaxHeapTuplesPerPageLimit];
 	int			uncnt = 0;
 	TransactionId visibility_cutoff_xid;
 	bool		all_frozen;

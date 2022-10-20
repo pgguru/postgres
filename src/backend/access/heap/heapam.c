@@ -9088,7 +9088,7 @@ heap_xlog_insert(XLogReaderState *record)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	HeapTupleHeader htup;
 	xl_heap_header xlhdr;
@@ -9210,7 +9210,7 @@ heap_xlog_multi_insert(XLogReaderState *record)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	HeapTupleHeader htup;
 	uint32		newlen;
@@ -9367,7 +9367,7 @@ heap_xlog_update(XLogReaderState *record, bool hot_update)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	xl_heap_header xlhdr;
 	uint32		newlen;

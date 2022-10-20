@@ -702,7 +702,7 @@ PageRepairFragmentation(Page page)
 	Offset		pd_upper = ((PageHeader) page)->pd_upper;
 	Offset		pd_special = ((PageHeader) page)->pd_special;
 	Offset		last_offset;
-	itemIdCompactData itemidbase[MaxHeapTuplesPerPage];
+	itemIdCompactData itemidbase[MaxHeapTuplesPerPageLimit];
 	itemIdCompact itemidptr;
 	ItemId		lp;
 	int			nline,

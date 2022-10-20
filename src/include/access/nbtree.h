@@ -173,8 +173,14 @@ typedef struct BTMetaPageData
 
 /*
  * MaxTIDsPerBTreePage is an upper bound on the number of heap TIDs tuples
- * that may be stored on a btree leaf page.  It is used to size the
- * per-page temporary buffers.
+ * that may be stored on a btree leaf page.  It is used to size the per-page
+ * temporary buffers.  This accounts for PageReservedSpace limit as well, so
+ * is a dynamic value depending on cluster settings.
+ *
+ * MaxTIDsPerBTreePageLimit is the same value without considering
+ * PageReservedSpace limit as well, so is used for fixed-size buffers, however
+ * code accessing these buffers should consider only MaxTIDsPerBTreePage when
+ * iterating over then.
  *
  * Note: we don't bother considering per-tuple overheads here to keep
  * things simple (value is based on how many elements a single array of
@@ -188,7 +194,10 @@ typedef struct BTMetaPageData
  * on a page.
  */
 #define MaxTIDsPerBTreePage \
-	(int) ((BLCKSZ - SizeOfPageHeaderData - MaxSizeOfPageReservedSpace - \
+	(int) ((BLCKSZ - SizeOfPageHeaderData - SizeOfPageReservedSpace - \
+			sizeof(BTPageOpaqueData)) / sizeof(ItemPointerData))
+#define MaxTIDsPerBTreePageLimit \
+	(int) ((BLCKSZ - SizeOfPageHeaderData - \
 			sizeof(BTPageOpaqueData)) / sizeof(ItemPointerData))
 
 /*
@@ -986,7 +995,7 @@ typedef struct BTScanPosData
 	int			lastItem;		/* last valid index in items[] */
 	int			itemIndex;		/* current index in items[] */
 
-	BTScanPosItem items[MaxTIDsPerBTreePage];	/* MUST BE LAST */
+	BTScanPosItem items[MaxTIDsPerBTreePageLimit];	/* MUST BE LAST */
 } BTScanPosData;
 
 typedef BTScanPosData *BTScanPos;

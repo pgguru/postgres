@@ -151,6 +151,3 @@ int64		VacuumPageDirty = 0;
 
 int			VacuumCostBalance = 0;	/* working state for vacuum */
 bool		VacuumCostActive = false;
-
-int			reserved_page_size = 0; /* how much page space to reserve for extended unencrypted metadata */
-

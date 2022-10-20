@@ -18,13 +18,10 @@
 #include "storage/block.h"
 #include "storage/item.h"
 #include "storage/off.h"
+#include "common/pagefeat.h"
 
-extern int reserved_page_size;
-
-#define SizeOfPageReservedSpace reserved_page_size
 /* strict upper bound on the amount of space occupied we have reserved on
  * pages in this cluster */
-#define MaxSizeOfPageReservedSpace 64
 
 /*
  * A postgres disk page is an abstraction layered on top of a postgres
