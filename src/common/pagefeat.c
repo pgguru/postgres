@@ -16,9 +16,12 @@
 #include "common/pagefeat.h"
 #include "utils/guc.h"
 
-/* global variable to store the reserved_page_size */
+/* global variables */
 int reserved_page_size;
 PageFeatureSet cluster_page_features;
+
+/* status GUCs, display only. set by XLog startup */
+bool page_feature_page_checksums32;
 
 /*
  * A "page feature" is an optional cluster-defined additional data field that
@@ -37,8 +40,15 @@ typedef struct PageFeatureDesc
 	char *guc_name;
 } PageFeatureDesc;
 
-/* these are the fixed widths for each feature type, indexed by feature */
+/* These are the fixed widths for each feature type, indexed by feature.  This
+ * is also used to lookup page features by the bootstrap process and expose
+ * the state of this page feature as a readonly boolean GUC, so when adding a
+ * named feature here ensure you also update the guc_tables file to add this,
+ * or the attempt to set the GUC will fail. */
+
 static PageFeatureDesc feature_descs[PF_MAX_FEATURE] = {
+	/* PF_PAGE_CHECKSUMS32 */
+	{ 2, "page_checksums32" },
 };
 
 

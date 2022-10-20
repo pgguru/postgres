@@ -213,3 +213,60 @@ pg_checksum_page(char *page, BlockNumber blkno)
 	 */
 	return (uint16) ((checksum % 65535) + 1);
 }
+
+
+/*
+ * Compute and return a 32-bit checksum for a Postgres page.
+ *
+ * Beware that the 16-bit portion of the page that cksum points to is
+ * transiently zeroed, as is the pd_checksums field.  The storage location for
+ * this is determined by the PageFeatures in play for cluster, so we are
+ * storing the
+ *
+ * The checksum includes the block number (to detect the case where a page is
+ * somehow moved to a different location), the page header (excluding the
+ * checksum itself), and the page data.
+ *
+ * The high bits of this are stored in the overflow storage area of the page
+ * pointed to by *cksum, leaving the pd_checksum field with the same checksum
+ * you'd expect if running the pg_checksum_page function.
+ */
+uint32
+pg_checksum32_page(char *page, BlockNumber blkno, char *cksum)
+{
+	PGChecksummablePage *cpage = (PGChecksummablePage *) page;
+	uint16		save_pd,save_ext,*ptr;
+	uint32		checksum;
+
+	/* We only calculate the checksum for properly-initialized pages */
+	Assert(!PageIsNew((Page) page));
+	/* Ensure that the cksum pointer is in the page range on this page */
+	Assert(cksum >= page && cksum <= (page + BLCKSZ - sizeof(uint16)));
+
+	ptr = (uint16*)cksum;
+
+	/*
+	 * Save the existing checksum locations and temporarily set it to zero, so
+	 * that the checksum calculation isn't affected by the old checksum stored
+	 * on the page.  Restore it after, because actually updating the checksum
+	 * is NOT part of the API of this function.
+	 */
+
+	save_ext = *ptr;
+	save_pd = cpage->phdr.pd_checksum;
+	*ptr = 0;
+	cpage->phdr.pd_checksum = 0;
+
+	checksum = pg_checksum_block(cpage);
+
+	/* restore */
+	*ptr = save_ext;
+	cpage->phdr.pd_checksum = save_pd;
+
+	/* Mix in the block number to detect transposed pages */
+	checksum ^= blkno;
+
+	/* ensure we have non-zero return value here; this does double-up on our
+	 * coset for group 1 here, but it's a nice property to preserve */
+	return (checksum == 0 ? 1 : checksum);
+}

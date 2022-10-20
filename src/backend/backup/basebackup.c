@@ -25,6 +25,7 @@
 #include "commands/defrem.h"
 #include "common/compression.h"
 #include "common/file_perm.h"
+#include "common/pagefeat.h"
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
 #include "nodes/pg_list.h"
@@ -1492,7 +1493,7 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 	int			fd;
 	BlockNumber blkno = 0;
 	bool		block_retry = false;
-	uint16		checksum;
+	uint32		checksum, page_checksum;
 	int			checksum_failures = 0;
 	off_t		cnt;
 	int			i;
@@ -1608,9 +1609,24 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 				 */
 				if (!PageIsNew(page) && PageGetLSN(page) < sink->bbs_state->startptr)
 				{
-					checksum = pg_checksum_page((char *) page, blkno + segmentno * RELSEG_SIZE);
-					phdr = (PageHeader) page;
-					if (phdr->pd_checksum != checksum)
+					char *extended_checksum_loc = NULL;
+
+					/* are we using extended checksums? */
+					if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
+					{
+						page_checksum = *(uint16*)extended_checksum_loc;
+						page_checksum <<= 16;
+						page_checksum += ((PageHeader)page)->pd_checksum;
+						checksum = (uint32)pg_checksum32_page(page, blkno + segmentno * RELSEG_SIZE, extended_checksum_loc);
+					}
+					else
+					{
+						phdr = (PageHeader) page;
+						page_checksum = (uint32)phdr->pd_checksum;
+						checksum = pg_checksum_page(page, blkno + segmentno * RELSEG_SIZE);
+					}
+
+					if (page_checksum != checksum)
 					{
 						/*
 						 * Retry the block on the first failure.  It's
@@ -1661,9 +1677,9 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 							ereport(WARNING,
 									(errmsg("checksum verification failed in "
 											"file \"%s\", block %u: calculated "
-											"%X but expected %X",
+											"%lu but expected %lu",
 											readfilename, blkno, checksum,
-											phdr->pd_checksum)));
+											page_checksum)));
 						if (checksum_failures == 5)
 							ereport(WARNING,
 									(errmsg("further checksum verification "
