@@ -22,6 +22,7 @@ PageFeatureSet cluster_page_features;
 
 /* status GUCs, display only. set by XLog startup */
 bool page_feature_page_checksums32;
+bool page_feature_wasted_space;
 
 /*
  * A "page feature" is an optional cluster-defined additional data field that
@@ -49,6 +50,8 @@ typedef struct PageFeatureDesc
 static PageFeatureDesc feature_descs[PF_MAX_FEATURE] = {
 	/* PF_PAGE_CHECKSUMS32 */
 	{ 2, "page_checksums32" },
+	/* PF_WASTED_SPACE */
+	{ 40, "wasted_space" },
 };
 
 

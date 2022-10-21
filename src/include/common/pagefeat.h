@@ -17,6 +17,7 @@
 /* revealed for GUCs */
 extern int reserved_page_size;
 extern bool page_feature_page_checksums32;
+extern bool page_feature_wasted_space;
 
 /* forward declaration to avoid circular includes */
 typedef Pointer Page;
@@ -29,6 +30,7 @@ extern PageFeatureSet cluster_page_features;
 /* bit offset for features flags */
 typedef enum {
 	PF_PAGE_CHECKSUMS32 = 0,
+	PF_WASTED_SPACE,
 	PF_MAX_FEATURE /* must be last */
 } PageFeature;
 

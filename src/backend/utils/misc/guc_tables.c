@@ -1810,6 +1810,17 @@ struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"wasted_space", PGC_INTERNAL, PRESET_OPTIONS,
+			gettext_noop("Waste some space in the page. Not even a fill factor. Just testing multiple page features."),
+			NULL,
+			GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_RUNTIME_COMPUTED
+		},
+		&page_feature_wasted_space,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
 		{"syslog_sequence_numbers", PGC_SIGHUP, LOGGING_WHERE,
 			gettext_noop("Add sequence number to syslog messages to avoid duplicate suppression."),
 			NULL
