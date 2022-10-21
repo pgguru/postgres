@@ -22,6 +22,7 @@ PageFeatureSet cluster_page_features;
 
 /* status GUCs, display only. set by XLog startup */
 bool page_feature_page_checksums32;
+bool page_feature_page_checksums64;
 bool page_feature_wasted_space;
 
 /*
@@ -50,6 +51,8 @@ typedef struct PageFeatureDesc
 static PageFeatureDesc feature_descs[PF_MAX_FEATURE] = {
 	/* PF_PAGE_CHECKSUMS32 */
 	{ 2, "page_checksums32" },
+	/* PF_PAGE_CHECKSUMS64 */
+	{ 8, "page_checksums64" },
 	/* PF_WASTED_SPACE */
 	{ 40, "wasted_space" },
 };

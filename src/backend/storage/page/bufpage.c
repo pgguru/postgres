@@ -93,8 +93,8 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	bool		checksum_failure = false;
 	bool		header_sane = false;
 	bool		all_zeroes = false;
-	uint32		checksum = 0;
-	uint32		page_checksum = 0;
+	uint64		checksum = 0;
+	uint64		page_checksum = 0;
 	char       *extended_checksum_loc = NULL;
 	/*
 	 * Don't verify page data unless the page passes basic non-zero test
@@ -104,7 +104,12 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		if (DataChecksumsEnabled())
 		{
 			/* are we using extended checksums? */
-			if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
+			if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS64)))
+			{
+				page_checksum = *((uint64*)extended_checksum_loc);
+				checksum = pg_checksum64_page(page, blkno, (uint64*)extended_checksum_loc);
+			}
+			else if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
 			{
 				/* high bits of the existing checksum are stored as a uint16 at extended_checksum_loc, low bits in pd_checksum */
 				page_checksum = *((uint16*)extended_checksum_loc);
@@ -163,7 +168,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		if ((flags & PIV_LOG_WARNING) != 0)
 			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("page verification failed, calculated checksum %u but expected %u",
+					 errmsg("page verification failed, calculated checksum %lu but expected %lu",
 							checksum, page_checksum)));
 
 		if ((flags & PIV_REPORT_STAT) != 0)
@@ -1541,7 +1546,9 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 
 	memcpy(pageCopy, (char *) page, BLCKSZ);
 
-	if ((extended_checksum_loc = ClusterPageFeatureOffset(pageCopy, PF_PAGE_CHECKSUMS32)))
+	if ((extended_checksum_loc = ClusterPageFeatureOffset(pageCopy, PF_PAGE_CHECKSUMS64)))
+		*(uint64*)extended_checksum_loc = pg_checksum64_page(pageCopy, blkno, (uint64*)extended_checksum_loc);
+	else if ((extended_checksum_loc = ClusterPageFeatureOffset(pageCopy, PF_PAGE_CHECKSUMS32)))
 	{
 		/* 32-bit checksums split storage between pd_checksum and page feature offset */
 		uint32 checksum = pg_checksum32_page((char*)pageCopy, blkno, extended_checksum_loc);
@@ -1571,7 +1578,9 @@ PageSetChecksumInplace(Page page, BlockNumber blkno)
 		return;
 
 	/* are we using extended checksums? */
-	if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
+	if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS64)))
+		*(uint64*)extended_checksum_loc = pg_checksum64_page(page, blkno, (uint64*)extended_checksum_loc);
+	else if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
 	{
 		/* 32-bit checksums split storage between pd_checksum and page feature offset */
 		uint32 checksum = pg_checksum32_page((char*)page, blkno, extended_checksum_loc);

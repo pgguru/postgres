@@ -332,7 +332,9 @@ main(int argc, char *argv[])
 	printf(_("Reserved page size for features:      %d\n"),
 		   CalculateReservedPageSize(ControlFile->page_features));
 	printf(_("Using extended checksums:             %s\n"),
+		   PageFeatureSetHasFeature(ControlFile->page_features, PF_PAGE_CHECKSUMS64) \
+		   ? _("64-bit") :
 		   PageFeatureSetHasFeature(ControlFile->page_features, PF_PAGE_CHECKSUMS32) \
-		   ? _("yes") : _("no"));
+		   ? _("32-bit") : _("no"));
 	return 0;
 }

@@ -1493,7 +1493,7 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 	int			fd;
 	BlockNumber blkno = 0;
 	bool		block_retry = false;
-	uint32		checksum, page_checksum;
+	uint64		checksum, page_checksum;
 	int			checksum_failures = 0;
 	off_t		cnt;
 	int			i;
@@ -1612,7 +1612,12 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 					char *extended_checksum_loc = NULL;
 
 					/* are we using extended checksums? */
-					if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
+					if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS64)))
+					{
+						page_checksum = *(uint64*)extended_checksum_loc;
+						checksum = pg_checksum64_page(page, blkno + segmentno * RELSEG_SIZE, (uint64*)extended_checksum_loc);
+					}
+					else if ((extended_checksum_loc = ClusterPageFeatureOffset(page, PF_PAGE_CHECKSUMS32)))
 					{
 						page_checksum = *(uint16*)extended_checksum_loc;
 						page_checksum <<= 16;

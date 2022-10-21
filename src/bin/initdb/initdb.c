@@ -151,6 +151,7 @@ static bool sync_only = false;
 static bool show_setting = false;
 static bool data_checksums = false;
 static bool page_checksums32 = false;
+static bool page_checksums64 = false;
 static bool waste_space = false;
 static char *xlog_dir = NULL;
 static char *str_wal_segment_size_mb = NULL;
@@ -1324,11 +1325,12 @@ bootstrap_template1(void)
 	unsetenv("PGCLIENTENCODING");
 
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" --boot -X %d %s %s %s %s %s %s",
+			 "\"%s\" --boot -X %d %s %s %s %s %s %s %s",
 			 backend_exec,
 			 wal_segment_size_mb * (1024 * 1024),
 			 data_checksums ? "-k" : "",
 			 page_checksums32 ? "-e page_checksums32" : "",
+			 page_checksums64 ? "-e page_checksums64" : "",
 			 waste_space ? "-e wasted_space" : "",
 			 boot_options, extra_options,
 			 debug ? "-d 5" : "");
@@ -2152,7 +2154,8 @@ usage(const char *progname)
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
 	printf(_("      --icu-locale=LOCALE   set ICU locale ID for new databases\n"));
 	printf(_("  -k, --data-checksums      use data page checksums\n"));
-	printf(_("  -K, --extended-checksums  use extended data page checksums\n"));
+	printf(_("  -K, --extended-checksums={32|64}\n"
+			 "                            use extended data page checksums of the given bitsize\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
 	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
 			 "      --lc-monetary=, --lc-numeric=, --lc-time=LOCALE\n"
@@ -2808,7 +2811,7 @@ main(int argc, char *argv[])
 		{"waldir", required_argument, NULL, 'X'},
 		{"wal-segsize", required_argument, NULL, 12},
 		{"data-checksums", no_argument, NULL, 'k'},
-		{"extended-checksums", no_argument, NULL, 'K'},
+		{"extended-checksums", required_argument, NULL, 'K'},
 		{"waste-space", no_argument, NULL, 'w'},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
@@ -2855,7 +2858,7 @@ main(int argc, char *argv[])
 
 	/* process command-line options */
 
-	while ((c = getopt_long(argc, argv, "A:dD:E:gkKL:nNsST:U:WwX:", long_options, &option_index)) != -1)
+	while ((c = getopt_long(argc, argv, "A:dD:E:gkK:L:nNsST:U:WwX:", long_options, &option_index)) != -1)
 	{
 		switch (c)
 		{
@@ -2908,7 +2911,22 @@ main(int argc, char *argv[])
 				data_checksums = true;
 				break;
 			case 'K':
-				page_checksums32 = true;
+				{
+					if (!strcmp(optarg,"32"))
+					{
+						page_checksums32 = true;
+						page_checksums64 = false;
+					}
+					else if (!strcmp(optarg,"64"))
+					{
+						page_checksums32 = false;
+						page_checksums64 = true;
+					}
+					else
+					{
+						pg_fatal("Must provide \"32\" or \"64\" as extended checksum size");
+					}
+				}
 				break;
 			case 'L':
 				share_path = pg_strdup(optarg);
@@ -3028,7 +3046,7 @@ main(int argc, char *argv[])
 	if (pwprompt && pwfilename)
 		pg_fatal("password prompt and password file cannot be specified together");
 
-	if (data_checksums && page_checksums32)
+	if (data_checksums && (page_checksums32 || page_checksums64) )
 		pg_fatal("data checksums and extended data checksums cannot be specified together");
 
 	check_authmethod_unspecified(&authmethodlocal);

@@ -1810,6 +1810,17 @@ struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"page_checksums64", PGC_INTERNAL, PRESET_OPTIONS,
+			gettext_noop("Shows whether 64-bit extended checksums are turned on for this cluster."),
+			NULL,
+			GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_RUNTIME_COMPUTED
+		},
+		&page_feature_page_checksums64,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
 		{"wasted_space", PGC_INTERNAL, PRESET_OPTIONS,
 			gettext_noop("Waste some space in the page. Not even a fill factor. Just testing multiple page features."),
 			NULL,

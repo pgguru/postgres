@@ -101,6 +101,7 @@
  */
 
 #include "storage/bufpage.h"
+#include "common/komihash.h"
 
 /* number of checksums to calculate in parallel */
 #define N_SUMS 32
@@ -138,6 +139,7 @@ do { \
 	(checksum) = __tmp * FNV_PRIME ^ (__tmp >> 17); \
 } while (0)
 
+
 /*
  * Block checksum algorithm.  The page must be adequately aligned
  * (at least on 4-byte boundary).
@@ -172,6 +174,8 @@ pg_checksum_block(const PGChecksummablePage *page)
 
 	return result;
 }
+
+
 
 /*
  * Compute the checksum for a Postgres page.
@@ -268,5 +272,63 @@ pg_checksum32_page(char *page, BlockNumber blkno, char *cksum)
 
 	/* ensure we have non-zero return value here; this does double-up on our
 	 * coset for group 1 here, but it's a nice property to preserve */
+	return (checksum == 0 ? 1 : checksum);
+}
+
+/*
+ * 64-bit block checksum algorithm.  The page must be adequately aligned
+ * (at least on 4-byte boundary).
+ */
+
+static uint64
+pg_checksum64_block(const PGChecksummablePage *page)
+{
+	/* ensure that the size is compatible with the algorithm */
+	Assert(sizeof(PGChecksummablePage) == BLCKSZ);
+
+	return (uint64)komihash(page, BLCKSZ, 0);
+}
+
+
+/*
+ * Compute and return a 64-bit checksum for a Postgres page.
+ *
+ * Beware that the 64-bit portion of the page that cksum points to is
+ * transiently zeroed, though it is restored.
+ *
+ * The checksum includes the block number (to detect the case where a page is
+ * somehow moved to a different location), the page header (excluding the
+ * checksum itself), and the page data.
+ *
+ * The high bits of this are stored in the overflow storage area of the page
+ * pointed to by *cksum, leaving the pd_checksum field with the same checksum
+ * you'd expect if running the pg_checksum_page function.
+ */
+uint64
+pg_checksum64_page(char *page, BlockNumber blkno, uint64 *cksumloc)
+{
+	PGChecksummablePage *cpage = (PGChecksummablePage *) page;
+	uint64      saved;
+	uint64      checksum;
+
+	/* We only calculate the checksum for properly-initialized pages */
+	Assert(!PageIsNew((Page) page));
+	/* Ensure that the cksum pointer is in the page range on this page */
+	Assert((char*)cksumloc >= page && (char*)cksumloc <= (page + BLCKSZ - sizeof(uint64)));
+
+	saved = *cksumloc;
+	*cksumloc = 0;
+
+	checksum = pg_checksum64_block(cpage);
+
+	/* restore */
+	*cksumloc = saved;
+
+	/* Mix in the block number to detect transposed pages */
+	checksum ^= blkno;
+
+	/* ensure in the extremely unlikely case that we have non-zero return
+	 * value here; this does double-up on our coset for group 1 here, but it's
+	 * a nice property to preserve */
 	return (checksum == 0 ? 1 : checksum);
 }

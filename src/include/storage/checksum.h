@@ -21,5 +21,6 @@
  */
 extern uint16 pg_checksum_page(char *page, BlockNumber blkno);
 extern uint32 pg_checksum32_page(char *page, BlockNumber blkno, char*offset);
+extern uint64 pg_checksum64_page(char *page, BlockNumber blkno, uint64*offset);
 
 #endif							/* CHECKSUM_H */
