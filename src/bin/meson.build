@@ -1,4 +1,5 @@
 subdir('initdb')
+subdir('pg_alterckey')
 subdir('pg_amcheck')
 subdir('pg_archivecleanup')
 subdir('pg_basebackup')

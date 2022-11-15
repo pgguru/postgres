@@ -12,6 +12,7 @@ common_sources = files(
   'ip.c',
   'jsonapi.c',
   'keywords.c',
+  'kmgr_utils.c',
   'kwlookup.c',
   'link-canary.c',
   'md5_common.c',
@@ -34,12 +35,14 @@ common_sources = files(
 
 if ssl.found()
   common_sources += files(
+    'cipher_openssl.c',
     'cryptohash_openssl.c',
     'hmac_openssl.c',
     'protocol_openssl.c',
   )
 else
   common_sources += files(
+    'cipher.c',
     'cryptohash.c',
     'hmac.c',
     'md5.c',
