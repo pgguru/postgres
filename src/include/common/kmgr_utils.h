@@ -40,6 +40,7 @@
 
 /* We always, today, use a 256-bit AES key. */
 #define KMGR_CLUSTER_KEY_LEN 	PG_AES256_KEY_LEN
+#define KMGR_KEK_KEY_LEN 	PG_AES256_KEY_LEN
 
 /* double for hex format, plus some for spaces, \r,\n, and null byte */
 #define ALLOC_KMGR_CLUSTER_KEY_LEN	(KMGR_CLUSTER_KEY_LEN * 2 + 10 + 2 + 1)
