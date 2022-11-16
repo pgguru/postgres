@@ -46,7 +46,7 @@
 #define ALLOC_KMGR_CLUSTER_KEY_LEN	(KMGR_CLUSTER_KEY_LEN * 2 + 10 + 2 + 1)
 
 /* Maximum length of key the key manager can store */
-#define KMGR_MAX_KEY_LEN			256
+#define KMGR_MAX_KEY_LEN			KMGR_CLUSTER_KEY_LEN * 8
 #define KMGR_MAX_KEY_LEN_BYTES		KMGR_MAX_KEY_LEN / 8
 
 
