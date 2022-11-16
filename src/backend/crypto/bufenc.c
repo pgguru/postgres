@@ -52,13 +52,13 @@ InitializeBufferEncryption(void)
 									 (unsigned char *) key->key,
 									 (key->klen), true);
 	if (!BufEncCtx)
-		elog(ERROR, "cannot intialize encryption context");
+		elog(ERROR, "cannot initialize encryption context");
 
 	BufDecCtx = pg_cipher_ctx_create(PG_CIPHER_AES_CTR,
 									 (unsigned char *) key->key,
 									 (key->klen), false);
 	if (!BufDecCtx)
-		elog(ERROR, "cannot intialize decryption context");
+		elog(ERROR, "cannot initialize decryption context");
 }
 
 /* Encrypt the given page with the relation key */
