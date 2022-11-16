@@ -38,8 +38,8 @@
 #define KMGR_KEY_ID_WAL 		1
 #define KMGR_NUM_DATA_KEYS	2
 
-/* We always, today, use a 256-bit AES key. */
-#define KMGR_CLUSTER_KEY_LEN 	PG_AES256_KEY_LEN
+/* When using XTS, our cluster key length is twice the AES size */
+#define KMGR_CLUSTER_KEY_LEN 	PG_AES256_KEY_LEN * 2
 #define KMGR_KEK_KEY_LEN 	PG_AES256_KEY_LEN
 
 /* double for hex format, plus some for spaces, \r,\n, and null byte */
