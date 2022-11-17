@@ -124,12 +124,16 @@ However, the same LSN can be used in multiple pages in the same relation
 new tuple to another page.  By adding the page number to the IV, we keep
 the IV unique.
 
-By not using the database id in the IV, CREATE DATABASE can copy the
-heap/index files from the old database to a new one without
-decryption/encryption.  Both page copies are valid.  Once a database
-changes its pages, it gets new LSNs, and hence new IV.  Using only the
-LSN and page number also avoids requiring pg_upgrade to preserve
-database oids, tablespace oids, and relfilenodes.
+CREATE DATABASE can be run with two different strategies: FILE_COPY or
+WAL_LOG.  If using WAL_LOG, the heap/index files are automatically
+rewritten with new LSNs as part of the copy operation and will get new
+IVs automatically.
+
+This approach still works with the older FILE_COPY stragegy; by not
+using the database id in the IV, CREATE DATABASE can copy the heap/index
+files from the old database to a new one without decryption/encryption.
+Both page copies are valid.  Once a database changes its pages, it gets
+new LSNs, and hence new IV.
 
 As part of WAL logging, every change of a WAL-logged page gets a new
 LSN, and therefore a new IV automatically.
