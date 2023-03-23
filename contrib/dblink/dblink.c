@@ -2602,9 +2602,11 @@ dblink_security_check(PGconn *conn, remoteConn *rconn, const char *connstr)
 	if (PQconnectionUsedPassword(conn) && dblink_connstr_has_pw(connstr))
 		return;
 
+#ifdef ENABLE_GSS
 	/* If GSSAPI used to connect, make sure it was one proxied */
 	if (PQconnectionUsedGSSAPI(conn) && be_gssapi_get_proxy(MyProcPort))
 		return;
+#endif
 
 	/* Otherwise, fail out */
 	libpqsrv_disconnect(conn);
@@ -2665,11 +2667,19 @@ dblink_connstr_check(const char *connstr)
 	if (superuser())
 		return;
 
+#ifdef ENABLE_GSS
 	if (!dblink_connstr_has_pw(connstr) && !be_gssapi_get_proxy(MyProcPort))
 		ereport(ERROR,
 				(errcode(ERRCODE_S_R_E_PROHIBITED_SQL_STATEMENT_ATTEMPTED),
 				 errmsg("password or gssapi proxied credentials required"),
 				 errdetail("Non-superusers must provide a password in the connection string or send proxied gssapi credentials.")));
+#else
+	if (!dblink_connstr_has_pw(connstr))
+		ereport(ERROR,
+				(errcode(ERRCODE_S_R_E_PROHIBITED_SQL_STATEMENT_ATTEMPTED),
+				 errmsg("password proxied credentials required"),
+				 errdetail("Non-superusers must provide a password in the connection string.")));
+#endif
 }
 
 /*

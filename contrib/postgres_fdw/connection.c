@@ -363,9 +363,11 @@ pgfdw_security_check(const char **keywords, const char **values, UserMapping *us
 	if (superuser_arg(user->userid))
 		return;
 
+#ifdef ENABLE_GSS
 	/* Connected via GSSAPI with proxied credentials- all good. */
 	if (PQconnectionUsedGSSAPI(conn) && be_gssapi_get_proxy(MyProcPort))
 		return;
+#endif
 
 	/* Ok if superuser set PW required false. */
 	if (!UserMappingPasswordRequired(user))
@@ -571,9 +573,11 @@ check_conn_params(const char **keywords, const char **values, UserMapping *user)
 	if (superuser_arg(user->userid))
 		return;
 
+#ifdef ENABLE_GSS
 	/* ok if the user provided their own proxied credentials */
 	if (be_gssapi_get_proxy(MyProcPort))
 		return;
+#endif
 
 	/* ok if params contain a non-empty password */
 	for (i = 0; keywords[i] != NULL; i++)
