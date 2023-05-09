@@ -1183,14 +1183,14 @@ CopyXLogRecordToWAL(int write_len, bool isLogSwitch, XLogRecData *rdata,
 	int			written;
 	XLogRecPtr	CurrPos;
 	XLogPageHeader pagehdr;
-	char authtag[8] = {0};
+	char authtag[XL_AUTHTAG_SIZE] = {0};
 
 	/* If encrypting we will need to precalculate the authtag for this record
 	 * and set xl_integrity to it. */
 	if (encrypt)
 	{
 		CalculateXLogRecordAuthtag(rdata, StartPos, authtag);
-		memcpy(&((XLogRecord*)rdata->data)->xl_integrity, authtag, 8);
+		memcpy(&((XLogRecord*)rdata->data)->xl_integrity, authtag, XL_AUTHTAG_SIZE);
 		/* Start the encryption process; initializes record IV and precalculates AAD */
 		StartEncryptXLogRecord((XLogRecord*)rdata->data, StartPos);
 	}
