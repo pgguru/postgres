@@ -3386,7 +3386,6 @@ main(int argc, char *argv[])
 				break;
 			case 19:
 				cluster_key_cmd = pg_strdup(optarg);
-				using_page_feats = true;
 				break;
 			case 'u':
 				old_key_datadir = pg_strdup(optarg);
@@ -3508,6 +3507,9 @@ main(int argc, char *argv[])
 	if (file_encryption_method == DISABLED_ENCRYPTION_METHOD &&
 		cluster_key_cmd != NULL)
 		file_encryption_method = DEFAULT_ENABLED_ENCRYPTION_METHOD;
+
+	/* update page features requirement if encryption method uses authtag */
+	using_page_feats |= (encryption_methods[file_encryption_method].authtag_len > 0);
 
 	check_authmethod_unspecified(&authmethodlocal);
 	check_authmethod_unspecified(&authmethodhost);
