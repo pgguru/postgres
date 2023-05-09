@@ -39,8 +39,8 @@
  * used to distinguish between block references, and the main data structs.
  */
 
-#define XL_AUTHTAG_SIZE 8
-#define XL_HEADER_PAD 6
+#define XL_AUTHTAG_SIZE 12
+#define XL_HEADER_PAD 2
 
 typedef struct XLogRecord
 {
