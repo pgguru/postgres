@@ -39,7 +39,8 @@
  * used to distinguish between block references, and the main data structs.
  */
 
-#define AUTHTAG_SIZE 8
+#define XL_AUTHTAG_SIZE 8
+#define XL_HEADER_PAD 6
 
 typedef struct XLogRecord
 {
@@ -48,16 +49,16 @@ typedef struct XLogRecord
 	XLogRecPtr	xl_prev;		/* ptr to previous record in log */
 	uint8		xl_info;		/* flag bits, see below */
 	RmgrId		xl_rmid;		/* resource manager for this record */
-	char        xl_pad[6];
+	uint8       xl_pad[XL_HEADER_PAD];		/* required alignment padding */
 	union {
 		uint32 crc;
-		unsigned char authtag[AUTHTAG_SIZE];			/* CRC or tag for this record */
+		unsigned char authtag[XL_AUTHTAG_SIZE];			/* CRC or tag for this record */
 	} xl_integrity;
 	/* XLogRecordBlockHeaders and XLogRecordDataHeader follow, no padding */
 
 } XLogRecord;
 
-#define SizeOfXLogRecord	(offsetof(XLogRecord, xl_integrity) + AUTHTAG_SIZE)
+#define SizeOfXLogRecord	(offsetof(XLogRecord, xl_integrity) + XL_AUTHTAG_SIZE)
 
 /*
  * The high 4 bits in xl_info may be used freely by rmgr. The

@@ -370,7 +370,7 @@ CalculateXLogRecordAuthtag(XLogRecData *recdata, XLogRecPtr address, char *tag)
 	int len;
 #define SCRATCH_SIZE 1024
 	unsigned char scratch[SCRATCH_SIZE];
-	char authtag[8];
+	char authtag[XL_AUTHTAG_SIZE];
 
 	/*
 	 * Unfortunately, in order to get the right value for the authtag, it is
@@ -452,8 +452,8 @@ CalculateXLogRecordAuthtag(XLogRecData *recdata, XLogRecPtr address, char *tag)
 	 * Finalize the encryption, which could add more to output, and extract
 	 * our authtag.
 	 */
-	pg_cipher_incr_finish(encr_state, scratch, &len, (unsigned char*)authtag, 8);
-	memcpy(tag,authtag,8);
+	pg_cipher_incr_finish(encr_state, scratch, &len, (unsigned char*)authtag, XL_AUTHTAG_SIZE);
+	memcpy(tag,authtag,XL_AUTHTAG_SIZE);
 }
 
 /* Incremental XLog Record Encryption */
@@ -562,12 +562,12 @@ int EncryptXLogRecordIncremental(char *plaintext, char *encdest, int len)
 void FinishEncryptXLogRecord(char *loc)
 {
 	int len;
-	unsigned char tag[8] = {0};
+	unsigned char tag[XL_AUTHTAG_SIZE] = {0};
 
 	Assert(bytes_processed <= bytes_tot);
 
     /* Finalize the encryption, which could add more to output. */
-	pg_cipher_incr_finish(encr_state, (unsigned char*)loc, &len, tag, 8);
+	pg_cipher_incr_finish(encr_state, (unsigned char*)loc, &len, tag, XL_AUTHTAG_SIZE);
 	bytes_processed += len;
 
 	/* ensure we copied all the data we expected */
