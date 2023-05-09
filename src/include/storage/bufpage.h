@@ -339,6 +339,8 @@ static inline PageFeatureSet PageGetPageFeatures(Page page)
 		: 0;
 }
 
+#define PageIsUsingPageFeatures(page) (((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS)
+
 /*
  * Return the size of space allocated for page features.
  */
