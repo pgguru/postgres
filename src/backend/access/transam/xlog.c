@@ -863,7 +863,9 @@ XLogInsertRecord(XLogRecData *rdata,
 		if (!encrypt_wal)
 		{
 			rdata_crc = rechdr->xl_integrity.crc;
-			COMP_CRC32C(rdata_crc, rechdr, offsetof(XLogRecord, xl_integrity.crc));
+			COMP_CRC32C(rdata_crc, rechdr, offsetof(XLogRecord, xl_integrity));
+			/* this CRC field was moved due to alignment/padding issues, so now is calculated in two parts */
+			COMP_CRC32C(rdata_crc, rechdr + offsetof(XLogRecord, xl_info), offsetof(XLogRecord, xl_pad) - offsetof(XLogRecord, xl_info));
 			FIN_CRC32C(rdata_crc);
 			rechdr->xl_integrity.crc = rdata_crc;
 		}
@@ -4835,6 +4837,7 @@ BootStrapXLOG(void)
 		INIT_CRC32C(crc);
 		COMP_CRC32C(crc, ((char *) record) + SizeOfXLogRecord, record->xl_tot_len - SizeOfXLogRecord);
 		COMP_CRC32C(crc, (char *) record, offsetof(XLogRecord, xl_integrity));
+		COMP_CRC32C(crc, (char *) record + offsetof(XLogRecord, xl_info), offsetof(XLogRecord, xl_pad) - offsetof(XLogRecord, xl_info));
 		FIN_CRC32C(crc);
 		record->xl_integrity.crc = crc;
 	}

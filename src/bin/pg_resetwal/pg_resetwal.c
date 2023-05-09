@@ -1083,6 +1083,7 @@ WriteEmptyXLOG(void)
 	INIT_CRC32C(crc);
 	COMP_CRC32C(crc, ((char *) record) + SizeOfXLogRecord, record->xl_tot_len - SizeOfXLogRecord);
 	COMP_CRC32C(crc, (char *) record, offsetof(XLogRecord, xl_integrity));
+	COMP_CRC32C(crc, (char *) record + offsetof(XLogRecord, xl_info), offsetof(XLogRecord, xl_pad) - offsetof(XLogRecord, xl_info));
 	FIN_CRC32C(crc);
 	record->xl_integrity.crc = crc;
 

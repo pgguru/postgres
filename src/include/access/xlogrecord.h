@@ -47,18 +47,20 @@ typedef struct XLogRecord
 	uint32		xl_tot_len;		/* total len of entire record */
 	TransactionId xl_xid;		/* xact id */
 	XLogRecPtr	xl_prev;		/* ptr to previous record in log */
-	uint8		xl_info;		/* flag bits, see below */
-	RmgrId		xl_rmid;		/* resource manager for this record */
-	uint8       xl_pad[XL_HEADER_PAD];		/* required alignment padding */
 	union {
 		uint32 crc;
 		unsigned char authtag[XL_AUTHTAG_SIZE];			/* CRC or tag for this record */
 	} xl_integrity;
+	uint8		xl_info;		/* flag bits, see below */
+	RmgrId		xl_rmid;		/* resource manager for this record */
+	uint8       xl_pad[XL_HEADER_PAD];		/* required alignment padding */
 	/* XLogRecordBlockHeaders and XLogRecordDataHeader follow, no padding */
 
 } XLogRecord;
 
-#define SizeOfXLogRecord	(offsetof(XLogRecord, xl_integrity) + XL_AUTHTAG_SIZE)
+StaticAssertDecl((sizeof(XLogRecord) == MAXALIGN(sizeof(XLogRecord))), "XLogRecord padding is expected size");
+
+#define SizeOfXLogRecord	(offsetof(XLogRecord, xl_pad) + XL_HEADER_PAD)
 
 /*
  * The high 4 bits in xl_info may be used freely by rmgr. The

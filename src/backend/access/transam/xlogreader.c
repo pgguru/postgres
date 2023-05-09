@@ -1199,8 +1199,9 @@ ValidXLogRecord(XLogReaderState *state, XLogRecord *record, XLogRecPtr recptr)
 	/* Calculate the CRC */
 	INIT_CRC32C(crc);
 	COMP_CRC32C(crc, ((char *) record) + SizeOfXLogRecord, record->xl_tot_len - SizeOfXLogRecord);
-	/* include the record header last */
+	/* include the record header last, two parts since crc field got moved to middle */
 	COMP_CRC32C(crc, (char *) record, offsetof(XLogRecord, xl_integrity.crc));
+	COMP_CRC32C(crc, (char *) record + offsetof(XLogRecord, xl_info), offsetof(XLogRecord, xl_pad) - offsetof(XLogRecord, xl_info));
 	FIN_CRC32C(crc);
 
 	if (!EQ_CRC32C(record->xl_integrity.crc, crc))
