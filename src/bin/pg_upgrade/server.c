@@ -236,7 +236,7 @@ start_postmaster(ClusterInfo *cluster, bool report_and_exit_on_error)
 	 * win on ext4.
 	 */
 	snprintf(cmd, sizeof(cmd),
-			 "\"%s/pg_ctl\" -w -l \"%s/%s\" -D \"%s\" -o \"-p %d -b%s %s%s\" start",
+			 "\"%s/pg_ctl\" -w -l \"%s/%s\" -D \"%s\" -o \"-p %d%s -b %s%s\" start",
 			 cluster->bindir,
 			 log_opts.logdir,
 			 SERVER_LOG_FILE, cluster->pgconfig, cluster->port,
