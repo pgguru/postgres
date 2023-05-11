@@ -277,6 +277,8 @@ setup_additional_authenticated_data(Page page, BlockNumber blkno,
  * records.  It should be record->xl_tot_len bytes in space, and the caller
  * needs to reserve this space ahead of time and take all appropriate locks.
  */
+
+// TODO: this needs to be fixed to work with other-sized authtags and additional AAD checks/changes
 void
 EncryptXLogRecord(XLogRecord *record, XLogRecPtr address, char *dest)
 {
