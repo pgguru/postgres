@@ -521,10 +521,16 @@ sub init
 	mkdir $self->backup_dir;
 	mkdir $self->archive_dir;
 
+	my @initdb_options = ();
+
+	if ($ENV{PG_REGRESS_INITDB}) {
+		@initdb_options = split / /, ($ENV{PG_REGRESS_INITDB});
+	}
+
 	PostgreSQL::Test::Utils::system_or_bail('initdb', '-D', $pgdata, '-A',
 		'trust', '-N', @{ $params{extra} });
 	PostgreSQL::Test::Utils::system_or_bail($ENV{PG_REGRESS},
-		'--config-auth', $pgdata, @{ $params{auth_extra} });
+		'--config-auth', $pgdata, @{ $params{auth_extra} }, @initdb_options);
 
 	open my $conf, '>>', "$pgdata/postgresql.conf";
 	print $conf "\n# Added by PostgreSQL::Test::Cluster.pm\n";
