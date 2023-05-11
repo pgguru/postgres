@@ -357,14 +357,6 @@ page_checksum_internal(PG_FUNCTION_ARGS, enum pageinspect_version ext_version)
 	if (PageIsNew(page))
 		PG_RETURN_NULL();
 
-	if (PageIsUsingPageFeatures(page))
-	{
-		ereport(WARNING,
-				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				 errmsg("page using features, not checksums")));
-		PG_RETURN_NULL();
-	}
-
 	PG_RETURN_INT16(pg_checksum_page((char *) page, blkno));
 }
 
