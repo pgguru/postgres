@@ -558,10 +558,10 @@ pg_pwrite_zeros(int fd, size_t size, off_t offset)
 
 			iov[iovcnt].iov_base = zerobuf_addr;
 
-			if (remaining_size < BLCKSZ)
+			if (remaining_size < sizeof(zbuffer.data))
 				this_iov_size = remaining_size;
 			else
-				this_iov_size = BLCKSZ;
+				this_iov_size = sizeof(zbuffer.data);
 
 			iov[iovcnt].iov_len = this_iov_size;
 			remaining_size -= this_iov_size;
