@@ -3930,41 +3930,44 @@ WriteControlFile(void)
 	memset(buffer, 0, PG_CONTROL_FILE_SIZE);
 	memcpy(buffer, ControlFile, sizeof(ControlFileData));
 
-	fd = BasicOpenFile(XLOG_CONTROL_FILE,
-					   O_RDWR | O_CREAT | O_EXCL | PG_BINARY);
-	if (fd < 0)
-		ereport(PANIC,
-				(errcode_for_file_access(),
-				 errmsg("could not create file \"%s\": %m",
-						XLOG_CONTROL_FILE)));
 
-	errno = 0;
-	pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_WRITE);
-	if (write(fd, buffer, PG_CONTROL_FILE_SIZE) != PG_CONTROL_FILE_SIZE)
-	{
-		/* if write didn't set errno, assume problem is no disk space */
-		if (errno == 0)
-			errno = ENOSPC;
-		ereport(PANIC,
-				(errcode_for_file_access(),
-				 errmsg("could not write to file \"%s\": %m",
-						XLOG_CONTROL_FILE)));
-	}
-	pgstat_report_wait_end();
+#define WriteControlFileBuffer(filename, buffer) do {	\
+	fd = BasicOpenFile(filename, \
+					   O_RDWR | O_CREAT | O_EXCL | PG_BINARY); \
+	if (fd < 0) \
+		ereport(PANIC, \
+				(errcode_for_file_access(), \
+				 errmsg("could not create file \"%s\": %m", \
+						filename))); \
+	errno = 0; \
+	pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_WRITE); \
+	if (write(fd, buffer, PG_CONTROL_FILE_SIZE) != PG_CONTROL_FILE_SIZE) \
+	{ \
+		/* if write didn't set errno, assume problem is no disk space */ \
+		if (errno == 0) \
+			errno = ENOSPC; \
+		ereport(PANIC, \
+				(errcode_for_file_access(), \
+				 errmsg("could not write to file \"%s\": %m", \
+						filename))); \
+	} \
+	pgstat_report_wait_end(); \
+	pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_SYNC); \
+	if (pg_fsync(fd) != 0) \
+		ereport(PANIC, \
+				(errcode_for_file_access(), \
+				 errmsg("could not fsync file \"%s\": %m", \
+						filename))); \
+	pgstat_report_wait_end(); \
+	if (close(fd) != 0) \
+		ereport(PANIC, \
+				(errcode_for_file_access(), \
+				 errmsg("could not close file \"%s\": %m", \
+						filename))); \
+	} while(0);
 
-	pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_SYNC);
-	if (pg_fsync(fd) != 0)
-		ereport(PANIC,
-				(errcode_for_file_access(),
-				 errmsg("could not fsync file \"%s\": %m",
-						XLOG_CONTROL_FILE)));
-	pgstat_report_wait_end();
-
-	if (close(fd) != 0)
-		ereport(PANIC,
-				(errcode_for_file_access(),
-				 errmsg("could not close file \"%s\": %m",
-						XLOG_CONTROL_FILE)));
+	WriteControlFileBuffer(XLOG_CONTROL_FILE, buffer);
+	WriteControlFileBuffer(XLOG_CONTROL_FILE_BKUP, buffer);
 }
 
 static void
@@ -4170,7 +4173,7 @@ ReadControlFile(void)
 static void
 UpdateControlFile(void)
 {
-	update_controlfile(DataDir, ControlFile, true);
+	update_controlfile(DataDir, ControlFile, true, true);
 }
 
 /*

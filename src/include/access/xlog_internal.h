@@ -148,6 +148,7 @@ typedef XLogLongPageHeaderData *XLogLongPageHeader;
  */
 #define XLOGDIR				"pg_wal"
 #define XLOG_CONTROL_FILE	"global/pg_control"
+#define XLOG_CONTROL_FILE_BKUP	"global/pg_control_bkup"
 
 /*
  * These macros encapsulate knowledge about the exact layout of XLog file

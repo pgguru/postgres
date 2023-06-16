@@ -143,7 +143,8 @@ get_controlfile(const char *DataDir, bool *crc_ok_p)
  */
 void
 update_controlfile(const char *DataDir,
-				   ControlFileData *ControlFile, bool do_sync)
+				   ControlFileData *ControlFile, bool do_sync,
+				   bool update_bkup_file)
 {
 	int			fd;
 	char		buffer[PG_CONTROL_FILE_SIZE];
@@ -235,5 +236,78 @@ update_controlfile(const char *DataDir,
 #else
 		pg_fatal("could not close file \"%s\": %m", ControlFilePath);
 #endif
+	}
+
+	if (update_bkup_file)
+	{
+		snprintf(ControlFilePath, sizeof(ControlFilePath), "%s/%s", DataDir, XLOG_CONTROL_FILE_BKUP);
+
+#ifndef FRONTEND
+
+		/*
+		 * All errors issue a PANIC, so no need to use OpenTransientFile() and to
+		 * worry about file descriptor leaks.
+		 */
+		if ((fd = BasicOpenFile(ControlFilePath, O_RDWR | PG_BINARY)) < 0)
+			ereport(PANIC,
+					(errcode_for_file_access(),
+					 errmsg("could not open file \"%s\": %m",
+						ControlFilePath)));
+#else
+		if ((fd = open(ControlFilePath, O_WRONLY | PG_BINARY,
+					   pg_file_create_mode)) == -1)
+			pg_fatal("could not open file \"%s\": %m", ControlFilePath);
+#endif
+
+		errno = 0;
+#ifndef FRONTEND
+		pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_WRITE_UPDATE);
+#endif
+		if (write(fd, buffer, PG_CONTROL_FILE_SIZE) != PG_CONTROL_FILE_SIZE)
+		{
+			/* if write didn't set errno, assume problem is no disk space */
+			if (errno == 0)
+				errno = ENOSPC;
+
+#ifndef FRONTEND
+			ereport(PANIC,
+					(errcode_for_file_access(),
+					 errmsg("could not write file \"%s\": %m",
+							ControlFilePath)));
+#else
+			pg_fatal("could not write file \"%s\": %m", ControlFilePath);
+#endif
+		}
+#ifndef FRONTEND
+		pgstat_report_wait_end();
+#endif
+
+		if (do_sync)
+		{
+#ifndef FRONTEND
+			pgstat_report_wait_start(WAIT_EVENT_CONTROL_FILE_SYNC_UPDATE);
+			if (pg_fsync(fd) != 0)
+				ereport(PANIC,
+						(errcode_for_file_access(),
+						 errmsg("could not fsync file \"%s\": %m",
+								ControlFilePath)));
+			pgstat_report_wait_end();
+#else
+			if (fsync(fd) != 0)
+				pg_fatal("could not fsync file \"%s\": %m", ControlFilePath);
+#endif
+		}
+
+		if (close(fd) != 0)
+		{
+#ifndef FRONTEND
+			ereport(PANIC,
+					(errcode_for_file_access(),
+					 errmsg("could not close file \"%s\": %m",
+							ControlFilePath)));
+#else
+			pg_fatal("could not close file \"%s\": %m", ControlFilePath);
+#endif
+		}
 	}
 }

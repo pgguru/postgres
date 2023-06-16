@@ -115,6 +115,7 @@ struct exclude_list_item
  */
 static const struct exclude_list_item skip[] = {
 	{"pg_control", false},
+	{"pg_control_bkup", false},
 	{"pg_filenode.map", false},
 	{"pg_internal.init", true},
 	{"PG_VERSION", false},
@@ -637,7 +638,7 @@ main(int argc, char *argv[])
 		}
 
 		pg_log_info("updating control file");
-		update_controlfile(DataDir, ControlFile, do_sync);
+		update_controlfile(DataDir, ControlFile, do_sync, true);
 
 		if (verbose)
 			printf(_("Data checksum version: %u\n"), ControlFile->data_checksum_version);
