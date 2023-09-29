@@ -3431,6 +3431,7 @@ main(int argc, char *argv[])
 		printf(_("Data page checksums are disabled.\n"));
 
 	printf(_("Selected server block size: %d\n"), block_size);
+	printf(_("Reserved page size: %d\n"), cluster_reserved_page_size);
 
 	if (pwprompt || pwfilename)
 		get_su_pwd();
