@@ -46,7 +46,8 @@ typedef enum {
 	RESERVED_NONE = 0,
 	RESERVED_8,
 	RESERVED_16,
-	/* if you add to this, adjust the enum for MAX_RESERVED_SIZE */
+	RESERVED_24,
+	/* if you add to this, adjust the enum for MAX_RESERVED_SIZE and add switches to BlockSizeDecl and BlockSizeDecl2 */
 } ReservedBlockSize;
 
 /* Reserved page space allocates bins of the given size from the end of the
@@ -56,7 +57,7 @@ typedef enum {
 
 #define RESERVED_CHUNK_BITS 3
 #define RESERVED_CHUNK_SIZE (1<<RESERVED_CHUNK_BITS)
-#define MAX_RESERVED_SIZE SizeOfReservedBlock(RESERVED_16)
+#define MAX_RESERVED_SIZE SizeOfReservedBlock(RESERVED_24)
 #define SizeOfReservedBlock(b) ((b)<<RESERVED_CHUNK_BITS)
 #define IsValidReservedSize(s) ((s)>=0 && (s) <= MAX_RESERVED_SIZE)
 /* finds the block number for the nearest multiple of RESERVED_CHUNK_SIZE */
@@ -128,27 +129,37 @@ void BlockSizeInitFromControlFile();
 	break;																\
 	case RESERVED_8:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8)); break;	\
-	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8)); break;	\
-	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8)); break;	\
-	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8)); break;	\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8)); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8)); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8)); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8)); break; \
 	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_8)); break; \
 	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_8)); break; \
 	default: return 0;}													\
 	break;																\
 	case RESERVED_16:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16)); break;	\
-	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16)); break;	\
-	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16)); break;	\
-	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16)); break;	\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16)); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16)); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16)); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16)); break; \
 	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_16)); break; \
 	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_16)); break; \
 	default: return 0;}													\
 	break;																\
+	case RESERVED_24:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_24)); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_24)); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_24)); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_24)); break; \
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_24)); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_24)); break; \
+	default: return 0;}													\
+	break;																\
 	}; return 0;}
 
-#define BlockSizeDecl2(calc)											\
+#define BlockSizeDecl2(calc) \
 	static inline unsigned int _block_size_##calc(BlockSizeIdent bsi, ReservedBlockSize reserved, unsigned int arg) { \
 	switch(reserved){													\
 	case RESERVED_NONE:													\
@@ -163,22 +174,32 @@ void BlockSizeInitFromControlFile();
 	break;																\
 	case RESERVED_8:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8),arg); break;	\
-	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8),arg); break;	\
-	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8),arg); break;	\
-	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8),arg); break;	\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8),arg); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8),arg); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8),arg); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8),arg); break; \
 	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_8),arg); break; \
 	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_8),arg); break; \
 	default: return 0;}													\
 	break;																\
 	case RESERVED_16:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16),arg); break;	\
-	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16),arg); break;	\
-	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16),arg); break;	\
-	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16),arg); break;	\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16),arg); break; \
 	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_16),arg); break; \
 	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	default: return 0;}													\
+	break;																\
+	case RESERVED_24:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_24),arg); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_24),arg); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_24),arg); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_24),arg); break; \
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_24),arg); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_24),arg); break; \
 	default: return 0;}													\
 	break;																\
 	}; return 0;}
