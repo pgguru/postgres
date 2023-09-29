@@ -17,6 +17,7 @@
 /* revealed for GUCs */
 extern PGDLLIMPORT int reserved_page_size;
 extern PGDLLIMPORT bool page_feature_extended_checksums;
+extern PGDLLIMPORT bool page_feature_encryption_tags;
 
 /* forward declaration to avoid circular includes */
 typedef Pointer Page;
@@ -29,7 +30,8 @@ extern PGDLLIMPORT PageFeatureSet cluster_page_features;
 
 /* bit offset for features flags */
 typedef enum {
-	PF_EXT_CHECKSUMS = 0,  /* must be first */
+	PF_ENCRYPTION_TAG = 0,  /* must be first */
+	PF_EXT_CHECKSUMS,
 	PF_MAX_FEATURE /* must be last */
 } PageFeature;
 
@@ -49,6 +51,7 @@ void SetExtendedFeatureConfigOptions(PageFeatureSet features);
 uint16 PageFeatureSetCalculateSize(PageFeatureSet features);
 PageFeatureSet PageFeatureSetAddFeatureByName(PageFeatureSet features, const char *feat_name);
 PageFeatureSet PageFeatureSetAddFeature(PageFeatureSet features, PageFeature feature);
+void InitPageFeatures(int file_encryption_method);
 
 /* macros dealing with the current cluster's page features */
 char *PageGetFeatureOffset(Page page, PageFeature feature);

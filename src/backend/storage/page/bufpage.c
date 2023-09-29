@@ -17,6 +17,7 @@
 #include "access/htup_details.h"
 #include "access/itup.h"
 #include "access/xlog.h"
+#include "crypto/bufenc.h"
 #include "pgstat.h"
 #include "storage/checksum.h"
 #include "utils/memdebug.h"
@@ -97,7 +98,8 @@ PageInit(Page page, Size pageSize, Size specialSize, PageFeatureSet features)
  * to pgstat.
  */
 bool
-PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
+PageIsVerifiedExtended(Page page, ForkNumber forknum, bool relation_is_permanent,
+					   BlockNumber blkno, RelFileNumber fileno, int flags)
 {
 	PageHeader	p = (PageHeader) page;
 	size_t	   *pagebytes;
@@ -130,6 +132,8 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 			if (checksum != page_checksum)
 				checksum_failure = true;
 		}
+
+		PageDecryptInplace(page, forknum, relation_is_permanent, blkno, fileno);
 
 		/*
 		 * The following checks don't prove the header is correct, only that
@@ -1587,4 +1591,49 @@ PageSetChecksumInplace(Page page, BlockNumber blkno)
 							   (uint64*)extended_checksum_loc);
 	else
 		((PageHeader) page)->pd_feat.checksum = pg_checksum_page(page, blkno, cluster_block_size);
+}
+
+char *
+PageEncryptCopy(Page page, ForkNumber forknum, bool relation_is_permanent,
+				BlockNumber blkno, RelFileNumber fileno)
+{
+	static char *pageCopy = NULL;
+
+	/* If we don't need a checksum, just return the passed-in data */
+	if (PageIsNew(page) || !PageNeedsToBeEncrypted(forknum))
+		return (char *) page;
+
+	/*
+	 * We allocate the copy space once and use it over on each subsequent
+	 * call.  The point of palloc'ing here, rather than having a static char
+	 * array, is first to ensure adequate alignment for the checksumming code
+	 * and second to avoid wasting space in processes that never call this.
+	 */
+	if (pageCopy == NULL)
+		pageCopy = MemoryContextAlloc(TopMemoryContext, cluster_block_size);
+
+	memcpy(pageCopy, (char *) page, cluster_block_size);
+	EncryptPage(pageCopy, relation_is_permanent, blkno, fileno);
+	return pageCopy;
+}
+
+void
+PageEncryptInplace(Page page, ForkNumber forknum, bool relation_is_permanent,
+				   BlockNumber blkno, RelFileNumber fileno)
+{
+	if (PageIsNew(page) || !PageNeedsToBeEncrypted(forknum))
+		return;
+
+	EncryptPage(page, relation_is_permanent, blkno, fileno);
+}
+
+
+void
+PageDecryptInplace(Page page, ForkNumber forknum, bool relation_is_permanent,
+				   BlockNumber blkno, RelFileNumber fileno)
+{
+	if (PageIsNew(page) || !PageNeedsToBeEncrypted(forknum))
+		return;
+
+	DecryptPage(page, relation_is_permanent, blkno, fileno);
 }

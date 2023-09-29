@@ -22,7 +22,7 @@
 #include "common/pagefeat.h"
 
 /* Version identifier for this pg_control format */
-#define PG_CONTROL_VERSION	1300
+#define PG_CONTROL_VERSION	1600
 
 /* Nonce key length, see below */
 #define MOCK_AUTH_NONCE_LEN		32
@@ -78,6 +78,7 @@ typedef struct CheckPoint
 #define XLOG_FPI						0xB0
 /* 0xC0 is used in Postgres 9.5-11 */
 #define XLOG_OVERWRITE_CONTRECORD		0xD0
+#define XLOG_ENCRYPTION_LSN				0xE0
 
 
 /*
@@ -230,6 +231,8 @@ typedef struct ControlFileData
 	char		mock_authentication_nonce[MOCK_AUTH_NONCE_LEN];
 
 	uint32		reserved_page_size;	/* how many bytes to reserve per page */
+	/* File encryption method;  index into encryption_methods[]. */
+	int		file_encryption_method;
 
 	/* CRC of all above ... MUST BE LAST! */
 	pg_crc32c	crc;

@@ -15,9 +15,11 @@
 #define BUFPAGE_H
 
 #include "access/xlogdefs.h"
+#include "common/relpath.h"
 #include "storage/block.h"
 #include "storage/item.h"
 #include "storage/off.h"
+#include "storage/relfilelocator.h"
 #include "common/pagefeat.h"
 
 /* strict upper bound on the amount of space occupied we have reserved on
@@ -190,6 +192,8 @@ typedef struct PageHeaderData
 } PageHeaderData;
 
 typedef PageHeaderData *PageHeader;
+#define PageEncryptOffset	offsetof(PageHeaderData, pd_special)
+#define SizeOfPageEncryption(m) (cluster_block_size - PageEncryptOffset - SizeOfEncryptionTag(m))
 
 /*
  * pd_flags contains the following flag bits.  Undefined bits are initialized
@@ -334,6 +338,8 @@ static inline PageFeatureSet PageGetPageFeatures(Page page)
 		? (PageFeatureSet)((PageHeader)page)->pd_feat.features
 		: 0;
 }
+
+#define PageIsUsingPageFeatures(page) (((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS)
 
 /*
  * Return the size of space allocated for page features.
@@ -513,9 +519,9 @@ do { \
 						((overwrite) ? PAI_OVERWRITE : 0) | \
 						((is_heap) ? PAI_IS_HEAP : 0))
 
-#define PageIsVerified(page, blkno) \
-	PageIsVerifiedExtended(page, blkno, \
-						   PIV_LOG_WARNING | PIV_REPORT_STAT)
+#define PageIsVerified(page, relation_is_permanent, blkno, fileno)				\
+	PageIsVerifiedExtended(page, MAIN_FORKNUM, relation_is_permanent, blkno, \
+						   fileno, PIV_LOG_WARNING | PIV_REPORT_STAT)
 
 /* /\* */
 /*  * Check that cluster_block_size is a multiple of sizeof(size_t).  In */
@@ -527,8 +533,12 @@ do { \
 /* StaticAssertDecl(cluster_block_size == ((cluster_block_size / sizeof(size_t)) * sizeof(size_t)), */
 /* 				 "cluster_block_size has to be a multiple of sizeof(size_t)"); */
 
-extern void PageInit(Page page, Size pageSize, Size specialSize, PageFeatureSet features);
-extern bool PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags);
+	extern void PageInit(Page page, Size pageSize, Size specialSize, PageFeatureSet features);
+extern bool PageIsVerifiedExtended(Page page, ForkNumber forknum,
+								   bool relation_is_permanent,
+								   BlockNumber blkno,
+								   RelFileNumber fileno,
+								   int flags);
 extern OffsetNumber PageAddItemExtended(Page page, Item item, Size size,
 										OffsetNumber offsetNumber, int flags);
 extern Page PageGetTempPage(Page page);
@@ -548,5 +558,14 @@ extern bool PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 									Item newtup, Size newsize);
 extern char *PageSetChecksumCopy(Page page, BlockNumber blkno);
 extern void PageSetChecksumInplace(Page page, BlockNumber blkno);
+extern char *PageEncryptCopy(Page page, ForkNumber forknum,
+							 bool relation_is_permanent, BlockNumber blkno,
+							 RelFileNumber fileno);
+extern void PageEncryptInplace(Page page, ForkNumber forknum,
+							   bool relation_is_permanent, BlockNumber blkno,
+							   RelFileNumber fileno);
+extern void PageDecryptInplace(Page page, ForkNumber forknum,
+							   bool relation_is_permanent, BlockNumber blkno,
+							   RelFileNumber fileno);
 
 #endif							/* BUFPAGE_H */
