@@ -27,6 +27,7 @@ extern char *dbname;
 extern int	dbgetpassword;
 extern int	WalSegSz;
 extern int	BlockSize;
+extern int	ReservedSize;
 
 /* Connection kept global so we can disconnect easily */
 extern PGconn *conn;

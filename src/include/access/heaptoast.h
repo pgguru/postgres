@@ -20,7 +20,7 @@
 /*
  * Find the maximum size of a tuple if there are to be N tuples per page.
  */
-#define MaximumBytesPerTuple(tuplesPerPage) CalcMaximumBytesPerTuple(cluster_block_size,tuplesPerPage)
+#define MaximumBytesPerTuple(tuplesPerPage) CalcMaximumBytesPerTuple(cluster_block_size,SizeOfPageReservedSpace,tuplesPerPage)
 BlockSizeDecl2(CalcMaximumBytesPerTuple);
 
 /*
@@ -43,7 +43,7 @@ BlockSizeDecl2(CalcMaximumBytesPerTuple);
  */
 #define TOAST_TUPLES_PER_PAGE	4
 
-#define toast_tuple_threshold	CalcMaximumBytesPerTuple(cluster_block_size,TOAST_TUPLES_PER_PAGE)
+#define toast_tuple_threshold	CalcMaximumBytesPerTuple(cluster_block_size,SizeOfPageReservedSpace,TOAST_TUPLES_PER_PAGE)
 
 #define cluster_toast_tuple_target		toast_tuple_threshold
 
@@ -56,7 +56,7 @@ BlockSizeDecl2(CalcMaximumBytesPerTuple);
  */
 #define TOAST_TUPLES_PER_PAGE_MAIN	1
 
-#define toast_tuple_target_main CalcMaximumBytesPerTuple(cluster_block_size,TOAST_TUPLES_PER_PAGE_MAIN)
+#define toast_tuple_target_main CalcMaximumBytesPerTuple(cluster_block_size,SizeOfPageReservedSpace,TOAST_TUPLES_PER_PAGE_MAIN)
 
 /*
  * If an index value is larger than TOAST_INDEX_TARGET, we will try to
@@ -79,7 +79,7 @@ BlockSizeDecl2(CalcMaximumBytesPerTuple);
 
 #define EXTERN_TUPLE_MAX_SIZE	MaximumBytesPerTuple(EXTERN_TUPLES_PER_PAGE)
 
-#define TOAST_MAX_CHUNK_SIZE_LIMIT CalcToastMaxChunkSize(MAX_BLOCK_SIZE)
+#define TOAST_MAX_CHUNK_SIZE_LIMIT CalcToastMaxChunkSize(MAX_BLOCK_SIZE,0)
 #define cluster_toast_max_chunk_size BlockSizeCalc(cluster_block_setting,CalcToastMaxChunkSize)
 BlockSizeDecl(CalcToastMaxChunkSize);
 

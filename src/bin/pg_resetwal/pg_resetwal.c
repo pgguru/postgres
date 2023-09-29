@@ -425,7 +425,7 @@ main(int argc, char *argv[])
 	/*
 	 * Set some dependent calculated fields stored in pg_control
 	 */
-	BlockSizeInit(ControlFile.blcksz);
+	BlockSizeInit(ControlFile.blcksz, ControlFile.reserved_page_size);
 	ControlFile.toast_max_chunk_size = cluster_toast_max_chunk_size;
 	ControlFile.loblksize = cluster_loblksize;
 

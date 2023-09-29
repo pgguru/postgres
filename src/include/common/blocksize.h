@@ -41,26 +41,48 @@ typedef enum {
 	BLOCK_SIZE_32K,
 } BlockSizeIdent;
 
-extern PGDLLIMPORT BlockSizeIdent cluster_block_setting;
+/* The names of these enums are actually unimportant, but just indicate how much space we're reserving in total bytes */
+typedef enum {
+	RESERVED_NONE = 0,
+	RESERVED_8,
+	RESERVED_16,
+	/* if you add to this, adjust the enum for MAX_RESERVED_SIZE */
+} ReservedBlockSize;
 
-void BlockSizeInit(Size rawblocksize);
+/* Reserved page space allocates bins of the given size from the end of the
+ * page, up to the max amount supported.  This is 1<<RESERVED_CHUNK_BITS, so
+ * by default 8 bit chunks.  If you need to adjust this bin size, just adjust
+ * the number of bits for the desired amount. */
+
+#define RESERVED_CHUNK_BITS 3
+#define RESERVED_CHUNK_SIZE (1<<RESERVED_CHUNK_BITS)
+#define MAX_RESERVED_SIZE SizeOfReservedBlock(RESERVED_16)
+#define SizeOfReservedBlock(b) ((b)<<RESERVED_CHUNK_BITS)
+#define IsValidReservedSize(s) ((s)>=0 && (s) <= MAX_RESERVED_SIZE)
+/* finds the block number for the nearest multiple of RESERVED_CHUNK_SIZE */
+#define ReservedBlockForSize(s) ((ReservedBlockSize)((s+(RESERVED_CHUNK_SIZE-1))>>RESERVED_CHUNK_BITS))
+
+extern PGDLLIMPORT BlockSizeIdent cluster_block_setting;
+extern PGDLLIMPORT ReservedBlockSize cluster_reserved_page;
+
+void BlockSizeInit(Size rawblocksize, Size reserved);
+void BlockSizeInitFromControlFile();
+
 #define cluster_block_bits (cluster_block_setting+9)
 #define cluster_block_size (1<<cluster_block_bits)
 // TODO: make this calculate using use DEFAULT_BLOCK_SIZE instead?
 #define DEFAULT_BLOCK_SIZE_BITS 13 
 #define cluster_relseg_size (RELSEG_SIZE << DEFAULT_BLOCK_SIZE_BITS >> cluster_block_bits)
 
-/* Specific calculations' now parameterized sources */
-
 /* originally in heaptoast.h */
 
-#define CalcMaximumBytesPerTuple(blocksize,tuplesPerPage)	\
+#define CalcMaximumBytesPerTuple(blocksize,reserved,tuplesPerPage)	\
 	MAXALIGN_DOWN((blocksize - \
-				   MAXALIGN(SizeOfPageHeaderData + (tuplesPerPage) * sizeof(ItemIdData))) \
+				   MAXALIGN(SizeOfPageHeaderData + reserved + (tuplesPerPage) * sizeof(ItemIdData))) \
 				  / (tuplesPerPage))
 
-#define CalcToastMaxChunkSize(blocksize) \
-	(CalcMaximumBytesPerTuple(blocksize,EXTERN_TUPLES_PER_PAGE) -	\
+#define CalcToastMaxChunkSize(blocksize,reserved)							\
+	(CalcMaximumBytesPerTuple(blocksize,reserved,EXTERN_TUPLES_PER_PAGE) - \
 	 MAXALIGN(SizeofHeapTupleHeader) -					\
 	 sizeof(Oid) -										\
 	 sizeof(int32) -									\
@@ -68,52 +90,101 @@ void BlockSizeInit(Size rawblocksize);
 
 /* originally in htup_details.h */
 
-#define CalcMaxHeapTupleSize(size)  (size - MAXALIGN(SizeOfPageHeaderData + sizeof(ItemIdData)))
+#define CalcMaxHeapTupleSize(size,reserved)  (size - MAXALIGN(SizeOfPageHeaderData + reserved + sizeof(ItemIdData)))
 
-#define CalcMaxHeapTuplesPerPage(size)									\
-	((int) (((size) - SizeOfPageHeaderData) /							\
+#define CalcMaxHeapTuplesPerPage(size,reserved)									\
+	((int) (((size) - SizeOfPageHeaderData - reserved) /							\
 			(MAXALIGN(SizeofHeapTupleHeader) + sizeof(ItemIdData))))
 
 /* originally in itup.h */
 
-#define CalcMaxIndexTuplesPerPage(size)		\
-	((int) ((size - SizeOfPageHeaderData) / \
+#define CalcMaxIndexTuplesPerPage(size,reserved)							  \
+	((int) ((size - SizeOfPageHeaderData - reserved) / \
 			(MAXALIGN(sizeof(IndexTupleData) + 1) + sizeof(ItemIdData))))
 
 /* originally in nbtree_int.h */
 
-#define CalcMaxTIDsPerBTreePage(size)									\
-	(int) ((size - SizeOfPageHeaderData - sizeof(BTPageOpaqueData)) / \
+#define CalcMaxTIDsPerBTreePage(size, reserved)									\
+	(int) ((size - SizeOfPageHeaderData - reserved - sizeof(BTPageOpaqueData)) / \
 		   sizeof(ItemPointerData))
 
 /* originally in bloom.h */
-#define CalcFreeBlockNumberElems(size) (MAXALIGN_DOWN(size - SizeOfPageHeaderData - MAXALIGN(sizeof(BloomPageOpaqueData)) \
+#define CalcFreeBlockNumberElems(size,reserved) (MAXALIGN_DOWN(size - SizeOfPageHeaderData - reserved - MAXALIGN(sizeof(BloomPageOpaqueData)) \
 													   - MAXALIGN(sizeof(uint16) * 2 + sizeof(uint32) + sizeof(BloomOptions)) \
 									 ) / sizeof(BlockNumber))
 
 #define BlockSizeDecl(calc) \
-	static inline unsigned int _block_size_##calc(BlockSizeIdent bsi) {	\
+	static inline unsigned int _block_size_##calc(BlockSizeIdent bsi, ReservedBlockSize reserved) { \
+	switch(reserved){													\
+	case RESERVED_NONE:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024); break;						\
-	case BLOCK_SIZE_2K: return calc(2048); break;						\
-	case BLOCK_SIZE_4K: return calc(4096); break;						\
-	case BLOCK_SIZE_8K: return calc(8192); break;						\
-	case BLOCK_SIZE_16K: return calc(16384); break;						\
-	case BLOCK_SIZE_32K: return calc(32768); break;						\
-	default: return 0;}}
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_NONE)); break; \
+	default: return 0;}													\
+	break;																\
+	case RESERVED_8:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8)); break;	\
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8)); break;	\
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8)); break;	\
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8)); break;	\
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_8)); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_8)); break; \
+	default: return 0;}													\
+	break;																\
+	case RESERVED_16:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16)); break;	\
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16)); break;	\
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16)); break;	\
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16)); break;	\
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_16)); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_16)); break; \
+	default: return 0;}													\
+	break;																\
+	}; return 0;}
 
 #define BlockSizeDecl2(calc)											\
-	static inline unsigned int _block_size_##calc(BlockSizeIdent bsi, unsigned int arg) { \
+	static inline unsigned int _block_size_##calc(BlockSizeIdent bsi, ReservedBlockSize reserved, unsigned int arg) { \
+	switch(reserved){													\
+	case RESERVED_NONE:													\
 	switch(bsi){														\
-	case BLOCK_SIZE_1K: return calc(1024,arg); break;						\
-	case BLOCK_SIZE_2K: return calc(2048,arg); break;						\
-	case BLOCK_SIZE_4K: return calc(4096,arg); break;						\
-	case BLOCK_SIZE_8K: return calc(8192,arg); break;						\
-	case BLOCK_SIZE_16K: return calc(16384,arg); break;					\
-	case BLOCK_SIZE_32K: return calc(32768,arg); break;					\
-	default: return 0;}}
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_NONE),arg); break; \
+	default: return 0;}													\
+	break;																\
+	case RESERVED_8:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_8),arg); break;	\
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_8),arg); break;	\
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_8),arg); break;	\
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_8),arg); break;	\
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_8),arg); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_8),arg); break; \
+	default: return 0;}													\
+	break;																\
+	case RESERVED_16:													\
+	switch(bsi){														\
+	case BLOCK_SIZE_1K: return calc(1024,SizeOfReservedBlock(RESERVED_16),arg); break;	\
+	case BLOCK_SIZE_2K: return calc(2048,SizeOfReservedBlock(RESERVED_16),arg); break;	\
+	case BLOCK_SIZE_4K: return calc(4096,SizeOfReservedBlock(RESERVED_16),arg); break;	\
+	case BLOCK_SIZE_8K: return calc(8192,SizeOfReservedBlock(RESERVED_16),arg); break;	\
+	case BLOCK_SIZE_16K: return calc(16384,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	case BLOCK_SIZE_32K: return calc(32768,SizeOfReservedBlock(RESERVED_16),arg); break; \
+	default: return 0;}													\
+	break;																\
+	}; return 0;}
 
-#define BlockSizeCalc(bsi,calc) _block_size_##calc(bsi)
+#define BlockSizeCalc(bsi,calc) _block_size_##calc(bsi,cluster_reserved_page)
 
+extern PGDLLIMPORT int reserved_page_size;
 
 #endif

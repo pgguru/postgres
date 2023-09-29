@@ -350,12 +350,17 @@ main(int argc, char **argv)
 
 	sanityChecks();
 
-	if (IsValidBlockSize(ControlFile_source.blcksz) &&
-		ControlFile_source.blcksz == ControlFile_target.blcksz)
-		BlockSizeInit(ControlFile_source.blcksz);
-	else
+	if (!(IsValidBlockSize(ControlFile_source.blcksz) &&
+		  ControlFile_source.blcksz == ControlFile_target.blcksz))
 		pg_fatal("cluster block sizes do not match or are invalid: %d",
 				 ControlFile_source.blcksz);
+
+	if (!(IsValidReservedSize(ControlFile_source.reserved_page_size) &&
+		  ControlFile_source.reserved_page_size == ControlFile_target.reserved_page_size))
+		pg_fatal("cluster reserved page sizes do not match or are invalid: %d",
+				 ControlFile_source.blcksz);
+
+	BlockSizeInit(ControlFile_source.blcksz, ControlFile_source.reserved_page_size);
 
 	/*
 	 * Usually, the TLI can be found in the latest checkpoint record. But if

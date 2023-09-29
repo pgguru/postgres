@@ -26,7 +26,6 @@
 /* GUC variable */
 bool		ignore_checksum_failure = false;
 
-
 /* ----------------------------------------------------------------
  *						Page support functions
  * ----------------------------------------------------------------
@@ -43,7 +42,7 @@ PageInit(Page page, Size pageSize, Size specialSize)
 {
 	PageHeader	p = (PageHeader) page;
 
-	specialSize = MAXALIGN(specialSize);
+	specialSize = MAXALIGN(specialSize) + reserved_page_size;
 
 	Assert(pageSize == cluster_block_size);
 	Assert(pageSize > specialSize + SizeOfPageHeaderData);
@@ -117,7 +116,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		if ((p->pd_flags & ~PD_VALID_FLAG_BITS) == 0 &&
 			p->pd_lower <= p->pd_upper &&
 			p->pd_upper <= p->pd_special &&
-			p->pd_special <= cluster_block_size &&
+			p->pd_special + reserved_page_size <= cluster_block_size &&
 			p->pd_special == MAXALIGN(p->pd_special))
 			header_sane = true;
 
@@ -211,7 +210,7 @@ PageAddItemExtended(Page page,
 	if (phdr->pd_lower < SizeOfPageHeaderData ||
 		phdr->pd_lower > phdr->pd_upper ||
 		phdr->pd_upper > phdr->pd_special ||
-		phdr->pd_special > cluster_block_size)
+		phdr->pd_special + reserved_page_size > cluster_block_size)
 		ereport(PANIC,
 				(errcode(ERRCODE_DATA_CORRUPTED),
 				 errmsg("corrupted page pointers: lower = %u, upper = %u, special = %u",
@@ -723,7 +722,7 @@ PageRepairFragmentation(Page page)
 	if (pd_lower < SizeOfPageHeaderData ||
 		pd_lower > pd_upper ||
 		pd_upper > pd_special ||
-		pd_special > cluster_block_size ||
+		pd_special + reserved_page_size > cluster_block_size ||
 		pd_special != MAXALIGN(pd_special))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1066,7 +1065,7 @@ PageIndexTupleDelete(Page page, OffsetNumber offnum)
 	if (phdr->pd_lower < SizeOfPageHeaderData ||
 		phdr->pd_lower > phdr->pd_upper ||
 		phdr->pd_upper > phdr->pd_special ||
-		phdr->pd_special > cluster_block_size ||
+		phdr->pd_special + reserved_page_size > cluster_block_size ||
 		phdr->pd_special != MAXALIGN(phdr->pd_special))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1201,7 +1200,7 @@ PageIndexMultiDelete(Page page, OffsetNumber *itemnos, int nitems)
 	if (pd_lower < SizeOfPageHeaderData ||
 		pd_lower > pd_upper ||
 		pd_upper > pd_special ||
-		pd_special > cluster_block_size ||
+		pd_special + reserved_page_size > cluster_block_size ||
 		pd_special != MAXALIGN(pd_special))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1307,7 +1306,7 @@ PageIndexTupleDeleteNoCompact(Page page, OffsetNumber offnum)
 	if (phdr->pd_lower < SizeOfPageHeaderData ||
 		phdr->pd_lower > phdr->pd_upper ||
 		phdr->pd_upper > phdr->pd_special ||
-		phdr->pd_special > cluster_block_size ||
+		phdr->pd_special + reserved_page_size > cluster_block_size ||
 		phdr->pd_special != MAXALIGN(phdr->pd_special))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
@@ -1419,7 +1418,7 @@ PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 	if (phdr->pd_lower < SizeOfPageHeaderData ||
 		phdr->pd_lower > phdr->pd_upper ||
 		phdr->pd_upper > phdr->pd_special ||
-		phdr->pd_special > cluster_block_size ||
+		phdr->pd_special + reserved_page_size > cluster_block_size ||
 		phdr->pd_special != MAXALIGN(phdr->pd_special))
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),

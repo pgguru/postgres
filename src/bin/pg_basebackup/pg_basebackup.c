@@ -2749,7 +2749,7 @@ main(int argc, char **argv)
 	if (!RetrieveBlockSize(conn))
 		exit(1);
 
-	BlockSizeInit(BlockSize);
+	BlockSizeInit(BlockSize, ReservedSize);
 
 	/* Create pg_wal symlink, if required */
 	if (xlog_dir)

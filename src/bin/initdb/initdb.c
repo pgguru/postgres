@@ -200,6 +200,7 @@ static int	n_connections = 10;
 static int	n_buffers = 50;
 static const char *dynamic_shared_memory_type = NULL;
 static const char *default_timezone = NULL;
+static int cluster_reserved_page_size = 0;
 
 /*
  * Warning messages for authentication methods
@@ -1151,12 +1152,12 @@ test_specific_config_settings(int test_conns, int test_buffs)
 
 	/* Set up the test postmaster invocation */
 	printfPQExpBuffer(&cmd,
-					  "\"%s\" --check %s %s -b %d "
+					  "\"%s\" --check %s %s -b %d:%d "
 					  "-c max_connections=%d "
 					  "-c shared_buffers=%d "
 					  "-c dynamic_shared_memory_type=%s",
 					  backend_exec, boot_options, extra_options,
-					  block_size,
+					  block_size, cluster_reserved_page_size,
 					  test_conns, test_buffs,
 					  dynamic_shared_memory_type);
 
@@ -1542,7 +1543,7 @@ bootstrap_template1(void)
 
 	printfPQExpBuffer(&cmd, "\"%s\" --boot %s %s", backend_exec, boot_options, extra_options);
 	appendPQExpBuffer(&cmd, " -X %d", wal_segment_size_mb * (1024 * 1024));
-	appendPQExpBuffer(&cmd, " -b %d", block_size);
+	appendPQExpBuffer(&cmd, " -b %d:%d", block_size, cluster_reserved_page_size);
 	if (data_checksums)
 		appendPQExpBuffer(&cmd, " -k");
 	if (debug)
@@ -3108,6 +3109,7 @@ main(int argc, char *argv[])
 		{"waldir", required_argument, NULL, 'X'},
 		{"wal-segsize", required_argument, NULL, 12},
 		{"block-size", required_argument, NULL, 'b'},
+		{"reserved-size", required_argument, NULL, 19},
 		{"data-checksums", no_argument, NULL, 'k'},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
@@ -3302,6 +3304,10 @@ main(int argc, char *argv[])
 				if (!parse_sync_method(optarg, &sync_method))
 					exit(1);
 				break;
+			case 19:
+				if (!option_parse_int(optarg, "--reserved-size", 0, RESERVED_CHUNK_SIZE * MAX_RESERVED_SIZE, &cluster_reserved_page_size))
+					exit(1);
+				break;
 			default:
 				/* getopt_long already emitted a complaint */
 				pg_log_error_hint("Try \"%s --help\" for more information.", progname);
@@ -3386,7 +3392,10 @@ main(int argc, char *argv[])
 			pg_fatal("argument of --block-size must be a power of 2 between 1 and 32");
 	}
 
-	BlockSizeInit(block_size);
+	if (!IsValidReservedSize(cluster_reserved_page_size))
+		pg_fatal("Invalid reserved page space specified");
+
+	BlockSizeInit(block_size, cluster_reserved_page_size);
 
 	get_restricted_token();
 

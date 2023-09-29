@@ -1507,7 +1507,10 @@ InitializeGUCOptions(void)
 	/* Load our block size -- no valid in Bootstrap or init mode, since control file hasn't been written */
 	if (!(IsInitProcessingMode() || IsBootstrapProcessingMode()))
 	{
-		BlockSizeInit(ClusterBlockSize());
+		uint32 my_block_size, my_reserved_size;
+
+		GetClusterBlockSize(&my_block_size, &my_reserved_size);
+		BlockSizeInit(my_block_size, my_reserved_size);
 		/*
 		 * Ensure GUCs with dynamic limits have been properly initialized
 		 */

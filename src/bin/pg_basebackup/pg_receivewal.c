@@ -900,7 +900,7 @@ main(int argc, char **argv)
 	if (!RetrieveBlockSize(conn))
 		exit(1);
 
-	BlockSizeInit(BlockSize);
+	BlockSizeInit(BlockSize, ReservedSize);
 
 	/*
 	 * Don't close the connection here so that subsequent StreamLog() can

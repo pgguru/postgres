@@ -48,6 +48,7 @@
 
 uint32		bootstrap_data_checksum_version = 0;	/* No checksum */
 uint32		bootstrap_blocksize = DEFAULT_BLOCK_SIZE;
+uint32		bootstrap_reserved_size = 0;
 
 
 static void CheckerModeMain(void);
@@ -234,6 +235,16 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 							 errmsg("invalid block size: %s; must be power of two between 1k and 32k",
 									optarg)));
+				/* if we have a ':' in the string, the second-half is reserved page size */
+				if ((optarg = strchr(optarg, ':')) && optarg[1])
+				{
+					bootstrap_reserved_size = strtol(optarg + 1, NULL, 0);
+					if (!IsValidReservedSize(bootstrap_reserved_size))
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+								 errmsg("invalid reserved page size: %s; must be a multiple of %d from 0 to %d",
+										optarg+1, RESERVED_CHUNK_SIZE, MAX_RESERVED_SIZE)));
+				}
 				break;
 			case 'B':
 				SetConfigOption("shared_buffers", optarg, PGC_POSTMASTER, PGC_S_ARGV);
@@ -310,7 +321,7 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	if (!SelectConfigFiles(userDoption, progname))
 		proc_exit(1);
 
-	BlockSizeInit(bootstrap_blocksize);
+	BlockSizeInit(bootstrap_blocksize, bootstrap_reserved_size);
 
 	/*
 	 * Validate we have been given a reasonable-looking DataDir and change

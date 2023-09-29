@@ -3927,6 +3927,7 @@ WriteControlFile(void)
 	ControlFile->relseg_size = cluster_relseg_size;
 	ControlFile->xlog_blcksz = XLOG_BLCKSZ;
 	ControlFile->xlog_seg_size = wal_segment_size;
+	ControlFile->reserved_page_size = SizeOfReservedBlock(cluster_reserved_page);
 
 	ControlFile->nameDataLen = NAMEDATALEN;
 	ControlFile->indexMaxKeys = INDEX_MAX_KEYS;
@@ -3993,28 +3994,38 @@ WriteControlFile(void)
 extern int block_size;
 
 /*
- * This routine reads and returns the block size from the control file as
- * needed; since this is the only field we care about and it needs to be
- * handled early in the process, we don't worry about locks and the like; this
- * is static for the life of the cluster.
+ * This routine reads and returns the block size and reserved page size from
+ * the control file as needed; since these are the only fields we care about
+ * and were already initialized to constants at bootstrap time we don't worry
+ * about locks and the like of we have to read the file ourselves.
  */
-uint32
-ClusterBlockSize(void)
+void
+GetClusterBlockSize(uint32 *out_block_size, uint32 *out_reserved_size)
 {
 	pg_crc32c	crc;
 	int fd, r;
 	ControlFileData cluster_control;
 
-	if (block_size)
-		return block_size;
+	Assert(out_block_size && out_reserved_size);
 
-	if (ControlFile)
-		return ControlFile->blcksz;
+	/* already loaded/initialized; reuse globals */
+	if (block_size)
+	{
+		*out_block_size = block_size;
+		*out_reserved_size = reserved_page_size;
+		return;
+	}
+
+	if (ControlFile){
+		*out_block_size = ControlFile->blcksz;
+		*out_reserved_size = ControlFile->reserved_page_size;
+		return;
+	}
 
 	// TODO: check for bootstrap mode, since that's passed in the param?
 
 	/* neither shortcut worked, so go ahead and open the control file and
-	 * parse out only basic field */
+	 * parse out only basic fields */
 	fd = BasicOpenFile(XLOG_CONTROL_FILE,
 					   O_RDONLY | PG_BINARY);
 	if (fd < 0)
@@ -4074,9 +4085,8 @@ ClusterBlockSize(void)
 		ereport(FATAL,
 				(errmsg("incorrect checksum in control file")));
 
-	block_size = cluster_control.blcksz;
-
-	return block_size;
+	*out_block_size = block_size = cluster_control.blcksz;
+	*out_reserved_size = reserved_page_size = cluster_control.reserved_page_size;
 }
 
 static void
@@ -4086,6 +4096,8 @@ ReadControlFile(void)
 	int			fd;
 	static char wal_segsz_str[20];
 	static char block_size_str[20];
+	static char reserved_page_size_str[20];
+	int cluster_reserved_page_size;
 	int			r;
 	int block_size;
 	/*
@@ -4160,6 +4172,7 @@ ReadControlFile(void)
 	 */
 
 	block_size = ControlFile->blcksz;
+	cluster_reserved_page_size = ControlFile->reserved_page_size;
 
 	if (!IsValidBlockSize(block_size))
 		ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -4167,10 +4180,17 @@ ReadControlFile(void)
 									  "Block size must be a power of two between 1k and 32k, but the control file specifies %d bytes",
 									  block_size,
 									  block_size)));
+	if (!IsValidReservedSize(cluster_reserved_page_size))
+		ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						errmsg("Invalid reserved page size specified in control file: %d bytes",
+							   cluster_reserved_page_size)));
 
-	BlockSizeInit(block_size);
+	BlockSizeInit(block_size, cluster_reserved_page_size);
 	snprintf(block_size_str, sizeof(block_size_str), "%d", block_size);
 	SetConfigOption("block_size", block_size_str, PGC_INTERNAL,
+					PGC_S_DYNAMIC_DEFAULT);
+	snprintf(reserved_page_size_str, sizeof(reserved_page_size_str), "%d", reserved_page_size);
+	SetConfigOption("reserved_page_size", reserved_page_size_str, PGC_INTERNAL,
 					PGC_S_DYNAMIC_DEFAULT);
 
 	/*

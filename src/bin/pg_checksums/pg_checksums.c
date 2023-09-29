@@ -570,10 +570,13 @@ main(int argc, char *argv[])
 		mode == PG_MODE_ENABLE)
 		pg_fatal("data checksums are already enabled in cluster");
 
-	if (IsValidBlockSize(ControlFile->blcksz))
-		BlockSizeInit(ControlFile->blcksz);
-	else
+	if (!IsValidBlockSize(ControlFile->blcksz))
 		pg_fatal("invalid cluster block size in control file");
+
+	if (!IsValidReservedSize(ControlFile->reserved_page_size))
+		pg_fatal("invalid reserved page size in control file");
+
+	BlockSizeInit(ControlFile->blcksz, ControlFile->reserved_page_size);
 
 	/* Operate on all files if checking or enabling checksums */
 	if (mode == PG_MODE_CHECK || mode == PG_MODE_ENABLE)

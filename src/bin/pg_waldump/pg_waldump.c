@@ -44,6 +44,7 @@ static char *pgdata;
 
 static int	WalSegSz;
 static int	BlockSize;
+static int	ReservedSize;
 static volatile sig_atomic_t time_to_stop = false;
 
 static const RelFileLocator emptyRelFileLocator = {0, 0, 0};
@@ -1127,11 +1128,14 @@ main(int argc, char **argv)
 		pg_fatal("Could not locate control file");
 
 	BlockSize = ControlFile->blcksz;
-
 	if (!IsValidBlockSize(BlockSize))
 		pg_fatal("read invalid block size from control file");
 
-	BlockSizeInit(BlockSize);
+	ReservedSize = ControlFile->reserved_page_size;
+	if (!IsValidReservedSize(ReservedSize))
+		pg_fatal("read invalid reserved page size from control file");
+
+	BlockSizeInit(BlockSize, ReservedSize);
 
 	if (config.save_fullpage_path != NULL)
 		create_fullpage_directory(config.save_fullpage_path);

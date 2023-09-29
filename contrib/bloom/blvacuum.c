@@ -37,7 +37,7 @@ blbulkdelete(IndexVacuumInfo *info, IndexBulkDeleteResult *stats,
 	Relation	index = info->index;
 	BlockNumber blkno,
 				npages;
-	BlockNumber notFullPage[CalcFreeBlockNumberElems(MAX_BLOCK_SIZE)];
+	BlockNumber notFullPage[CalcFreeBlockNumberElems(MAX_BLOCK_SIZE,0)];
 	int			countPage = 0;
 	BloomState	state;
 	Buffer		buffer;

@@ -33,6 +33,7 @@
 
 int			WalSegSz;
 int			BlockSize;
+int			ReservedSize;
 
 static bool RetrieveDataDirCreatePerm(PGconn *conn);
 
@@ -355,6 +356,7 @@ RetrieveBlockSize(PGconn *conn)
 	if (PQserverVersion(conn) < MINIMUM_VERSION_FOR_SHOW_CMD)
 	{
 		BlockSize = DEFAULT_BLOCK_SIZE;
+		ReservedSize = 0;
 		return true;
 	}
 
@@ -395,6 +397,42 @@ RetrieveBlockSize(PGconn *conn)
 		return false;
 	}
 
+	/* same but for reserved size */
+	res = PQexec(conn, "SHOW reserved_page_size");
+	if (PQresultStatus(res) != PGRES_TUPLES_OK)
+	{
+		pg_log_error("could not send replication command \"%s\": %s",
+					 "SHOW reserved_page_size", PQerrorMessage(conn));
+
+		PQclear(res);
+		return false;
+	}
+	if (PQntuples(res) != 1 || PQnfields(res) < 1)
+	{
+		pg_log_error("could not fetch reserved page size: got %d rows and %d fields, expected %d rows and %d or more fields",
+					 PQntuples(res), PQnfields(res), 1, 1);
+
+		PQclear(res);
+		return false;
+	}
+
+	/* fetch xlog value and unit from the result */
+	if (sscanf(PQgetvalue(res, 0, 0), "%d", &ReservedSize) != 1)
+	{
+		pg_log_error("reserved page size could not be parsed");
+		PQclear(res);
+		return false;
+	}
+
+	PQclear(res);
+
+	if (!IsValidReservedSize(ReservedSize))
+	{
+		pg_log_error("do not support the reported remote page size of %d bytes",
+					 ReservedSize);
+		return false;
+	}
+	
 	return true;
 }
 

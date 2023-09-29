@@ -155,12 +155,12 @@ typedef struct BTMetaPageData
  * attribute, which we account for here.
  */
 #define BTMaxItemSize(page) \
-	(MAXALIGN_DOWN((PageGetPageSize(page) - \
+	(MAXALIGN_DOWN((PageGetPageSize(page) - SizeOfPageReservedSpace - \
 					MAXALIGN(SizeOfPageHeaderData + 3*sizeof(ItemIdData)) - \
 					MAXALIGN(sizeof(BTPageOpaqueData))) / 3) - \
 					MAXALIGN(sizeof(ItemPointerData)))
 #define BTMaxItemSizeNoHeapTid(page) \
-	MAXALIGN_DOWN((PageGetPageSize(page) - \
+	MAXALIGN_DOWN((PageGetPageSize(page) - SizeOfPageReservedSpace -\
 				   MAXALIGN(SizeOfPageHeaderData + 3*sizeof(ItemIdData)) - \
 				   MAXALIGN(sizeof(BTPageOpaqueData))) / 3)
 
@@ -176,7 +176,7 @@ typedef struct BTMetaPageData
  * than necessary as a result, which is considered acceptable.
  */
 #define MaxTIDsPerBTreePage BlockSizeCalc(cluster_block_setting,CalcMaxTIDsPerBTreePage)
-#define MaxTIDsPerBTreePageLimit CalcMaxTIDsPerBTreePage(MAX_BLOCK_SIZE)
+#define MaxTIDsPerBTreePageLimit CalcMaxTIDsPerBTreePage(MAX_BLOCK_SIZE,0)
 BlockSizeDecl(CalcMaxTIDsPerBTreePage);
 
 /*

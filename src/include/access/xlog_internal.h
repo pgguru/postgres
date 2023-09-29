@@ -391,7 +391,7 @@ extern void GetOldestRestartPoint(XLogRecPtr *oldrecptr, TimeLineID *oldtli);
 extern void XLogRecGetBlockRefInfo(XLogReaderState *record, bool pretty,
 								   bool detailed_format, StringInfo buf,
 								   uint32 *fpi_len);
-extern uint32 ClusterBlockSize(void);
+extern void GetClusterBlockSize(uint32 *out_block_size, uint32 *out_reserved_size);
 
 /*
  * Exported for the functions in timeline.c and xlogarchive.c.  Only valid
