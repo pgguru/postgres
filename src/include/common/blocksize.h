@@ -55,7 +55,7 @@ typedef enum {
  * by default 8 bit chunks.  If you need to adjust this bin size, just adjust
  * the number of bits for the desired amount. */
 
-#define RESERVED_CHUNK_BITS 3
+#define RESERVED_CHUNK_BITS 4
 #define RESERVED_CHUNK_SIZE (1<<RESERVED_CHUNK_BITS)
 #define MAX_RESERVED_SIZE SizeOfReservedBlock(RESERVED_24)
 #define SizeOfReservedBlock(b) ((b)<<RESERVED_CHUNK_BITS)
