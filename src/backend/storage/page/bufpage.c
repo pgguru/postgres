@@ -105,18 +105,29 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	bool		checksum_failure = false;
 	bool		header_sane = false;
 	bool		all_zeroes = false;
-	uint16		checksum = 0;
-
+	uint64		checksum = 0;
+	uint64		page_checksum = 0;
+	char       *extended_checksum_loc = NULL;
 	/*
 	 * Don't verify page data unless the page passes basic non-zero test
 	 */
 	if (!PageIsNew(page))
 	{
-		if (DataChecksumsEnabled() && !(p->pd_flags & PD_EXTENDED_FEATS))
+		if (DataChecksumsEnabled())
 		{
-			checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
-
-			if (checksum != p->pd_feat.checksum)
+			/* are we using extended checksums? */
+			if ((extended_checksum_loc = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS)))
+			{
+				page_checksum = pg_get_checksum64_page(page, cluster_block_size, (uint64*)extended_checksum_loc);
+				checksum = pg_checksum64_page(page, blkno, cluster_block_size, (uint64*)extended_checksum_loc);
+			}
+			else
+			{
+				/* traditional checksums in the pd_checksum field */
+				page_checksum = p->pd_feat.checksum;
+				checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
+			}
+			if (checksum != page_checksum)
 				checksum_failure = true;
 		}
 
@@ -161,8 +172,9 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		if ((flags & PIV_LOG_WARNING) != 0)
 			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("page verification failed, calculated checksum %u but expected %u",
-							checksum, p->pd_feat.checksum)));
+					 errmsg("page verification failed, calculated checksum "
+							UINT64_FORMAT " but expected " UINT64_FORMAT,
+							checksum, page_checksum)));
 
 		if ((flags & PIV_REPORT_STAT) != 0)
 			pgstat_report_checksum_failure();
@@ -1522,10 +1534,10 @@ char *
 PageSetChecksumCopy(Page page, BlockNumber blkno)
 {
 	static char *pageCopy = NULL;
+	char *extended_checksum_loc = NULL;
 
 	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled() || \
-		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
+	if (PageIsNew(page) || !DataChecksumsEnabled())
 		return (char *) page;
 
 	/*
@@ -1541,7 +1553,14 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 											 0);
 
 	memcpy(pageCopy, (char *) page, cluster_block_size);
-	((PageHeader) pageCopy)->pd_feat.checksum = pg_checksum_page(pageCopy, blkno, cluster_block_size);
+
+	if ((extended_checksum_loc = PageGetFeatureOffset(pageCopy, PF_EXT_CHECKSUMS)))
+		pg_set_checksum64_page(pageCopy,
+							   cluster_block_size,
+							   pg_checksum64_page(pageCopy, blkno, cluster_block_size, (uint64*)extended_checksum_loc),
+							   (uint64*)extended_checksum_loc);
+	else
+		((PageHeader) pageCopy)->pd_feat.checksum = pg_checksum_page(pageCopy, blkno, cluster_block_size);
 	return pageCopy;
 }
 
@@ -1554,10 +1573,18 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 void
 PageSetChecksumInplace(Page page, BlockNumber blkno)
 {
+	char *extended_checksum_loc = NULL;
+
 	/* If we don't need a checksum, just return */
-	if (PageIsNew(page) || !DataChecksumsEnabled() || \
-		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
+	if (PageIsNew(page) || !DataChecksumsEnabled())
 		return;
 
-	((PageHeader) page)->pd_feat.checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
+	/* are we using extended checksums? */
+	if ((extended_checksum_loc = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS)))
+		pg_set_checksum64_page(page,
+							   cluster_block_size,
+							   pg_checksum64_page(page, blkno, cluster_block_size, (uint64*)extended_checksum_loc),
+							   (uint64*)extended_checksum_loc);
+	else
+		((PageHeader) page)->pd_feat.checksum = pg_checksum_page(page, blkno, cluster_block_size);
 }

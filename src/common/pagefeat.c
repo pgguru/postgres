@@ -18,6 +18,9 @@
 /* global variables */
 PageFeatureSet cluster_page_features;
 
+/* status GUCs, display only. set by XLog startup */
+bool page_feature_extended_checksums;
+
 /*
  * A "page feature" is an optional cluster-defined additional data field that
  * is stored in the "reserved_page_size" area in the footer of a given Page.
@@ -41,7 +44,11 @@ typedef struct PageFeatureDesc
  * named feature here ensure you also update the guc_tables file to add this,
  * or the attempt to set the GUC will fail. */
 
-static PageFeatureDesc feature_descs[PF_MAX_FEATURE];
+static PageFeatureDesc feature_descs[PF_MAX_FEATURE] = {
+	/* PF_EXT_CHECKSUMS */
+	{ 8, "extended_checksums" }
+};
+
 
 /* Return the size for a given set of feature flags */
 uint16
