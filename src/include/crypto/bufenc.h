@@ -13,6 +13,7 @@
 
 #include "storage/bufmgr.h"
 #include "crypto/kmgr.h"
+#include "access/xlog_internal.h"
 
 /* Cluster encryption encrypts only main forks */
 #define PageNeedsToBeEncrypted(forknum) \
@@ -33,5 +34,10 @@ extern void EncryptPage(Page page, bool relation_is_permanent,
 						BlockNumber blkno, RelFileNumber fileno);
 extern void DecryptPage(Page page, bool relation_is_permanent,
 						BlockNumber blkno, RelFileNumber fileno);
-
+extern void EncryptXLogRecord(XLogRecord *record, XLogRecPtr address, char *dest);
+extern bool DecryptXLogRecord(XLogRecord *record, XLogRecPtr address);
+extern void CalculateXLogRecordAuthtag(XLogRecData *recdat, XLogRecPtr address, char *tag);
+extern void StartEncryptXLogRecord(XLogRecord *record, XLogRecPtr address);
+extern int EncryptXLogRecordIncremental(char *plaintext, char *encdest, int len);
+extern void FinishEncryptXLogRecord(char *loc);
 #endif							/* BUFENC_H */
