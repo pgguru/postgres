@@ -361,7 +361,7 @@ RelationAddBlocks(Relation relation, BulkInsertState bistate,
 			 first_block,
 			 RelationGetRelationName(relation));
 
-	PageInit(page, BufferGetPageSize(buffer), 0);
+	PageInit(page, BufferGetPageSize(buffer), 0, cluster_page_features);
 	MarkBufferDirty(buffer);
 
 	/*
@@ -696,7 +696,7 @@ loop:
 		 */
 		if (PageIsNew(page))
 		{
-			PageInit(page, BufferGetPageSize(buffer), 0);
+			PageInit(page, BufferGetPageSize(buffer), 0, cluster_page_features);
 			MarkBufferDirty(buffer);
 		}
 

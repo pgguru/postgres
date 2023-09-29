@@ -9011,7 +9011,7 @@ heap_xlog_visible(XLogReaderState *record)
 
 		/* initialize the page if it was read as zeros */
 		if (PageIsNew(vmpage))
-			PageInit(vmpage, cluster_block_size, 0);
+			PageInit(vmpage, cluster_block_size, 0, cluster_page_features);
 
 		/* remove VISIBILITYMAP_XLOG_* */
 		vmbits = xlrec->flags & VISIBILITYMAP_VALID_BITS;
@@ -9251,7 +9251,7 @@ heap_xlog_insert(XLogReaderState *record)
 	{
 		buffer = XLogInitBufferForRedo(record, 0);
 		page = BufferGetPage(buffer);
-		PageInit(page, BufferGetPageSize(buffer), 0);
+		PageInit(page, BufferGetPageSize(buffer), 0, cluster_page_features);
 		action = BLK_NEEDS_REDO;
 	}
 	else
@@ -9375,7 +9375,7 @@ heap_xlog_multi_insert(XLogReaderState *record)
 	{
 		buffer = XLogInitBufferForRedo(record, 0);
 		page = BufferGetPage(buffer);
-		PageInit(page, BufferGetPageSize(buffer), 0);
+		PageInit(page, BufferGetPageSize(buffer), 0, cluster_page_features);
 		action = BLK_NEEDS_REDO;
 	}
 	else
@@ -9593,7 +9593,7 @@ heap_xlog_update(XLogReaderState *record, bool hot_update)
 	{
 		nbuffer = XLogInitBufferForRedo(record, 0);
 		page = (Page) BufferGetPage(nbuffer);
-		PageInit(page, BufferGetPageSize(nbuffer), 0);
+		PageInit(page, BufferGetPageSize(nbuffer), 0, cluster_page_features);
 		newaction = BLK_NEEDS_REDO;
 	}
 	else

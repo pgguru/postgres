@@ -38,11 +38,18 @@ bool		ignore_checksum_failure = false;
  *		until it's time to write.
  */
 void
-PageInit(Page page, Size pageSize, Size specialSize)
+PageInit(Page page, Size pageSize, Size specialSize, PageFeatureSet features)
 {
 	PageHeader	p = (PageHeader) page;
 
-	specialSize = MAXALIGN(specialSize) + reserved_page_size;
+	specialSize = MAXALIGN(specialSize);
+
+	if (features)
+	{
+		Size reserved_size = PageFeatureSetCalculateSize(features);
+		Assert(reserved_size == MAXALIGN(reserved_size));
+		specialSize += reserved_size;
+	}
 
 	Assert(pageSize == cluster_block_size);
 	Assert(pageSize > specialSize + SizeOfPageHeaderData);
@@ -50,7 +57,13 @@ PageInit(Page page, Size pageSize, Size specialSize)
 	/* Make sure all fields of page are zero, as well as unused space */
 	MemSet(p, 0, pageSize);
 
-	p->pd_flags = 0;
+	if (features)
+	{
+		p->pd_flags = PD_EXTENDED_FEATS;
+		p->pd_feat.features = features;
+	}
+	else
+		p->pd_flags = 0; /* redundant w/MemSet? */
 	p->pd_lower = SizeOfPageHeaderData;
 	p->pd_upper = pageSize - specialSize;
 	p->pd_special = pageSize - specialSize;
@@ -99,11 +112,11 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	 */
 	if (!PageIsNew(page))
 	{
-		if (DataChecksumsEnabled())
+		if (DataChecksumsEnabled() && !(p->pd_flags & PD_EXTENDED_FEATS))
 		{
 			checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
 
-			if (checksum != p->pd_checksum)
+			if (checksum != p->pd_feat.checksum)
 				checksum_failure = true;
 		}
 
@@ -149,7 +162,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("page verification failed, calculated checksum %u but expected %u",
-							checksum, p->pd_checksum)));
+							checksum, p->pd_feat.checksum)));
 
 		if ((flags & PIV_REPORT_STAT) != 0)
 			pgstat_report_checksum_failure();
@@ -406,7 +419,7 @@ PageGetTempPageCopySpecial(Page page)
 	pageSize = PageGetPageSize(page);
 	temp = (Page) palloc(pageSize);
 
-	PageInit(temp, pageSize, PageGetSpecialSize(page));
+	PageInit(temp, pageSize, PageGetSpecialSize(page), PageGetPageFeatures(page));
 	memcpy(PageGetSpecialPointer(temp),
 		   PageGetSpecialPointer(page),
 		   PageGetSpecialSize(page));
@@ -1511,7 +1524,8 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 	static char *pageCopy = NULL;
 
 	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
+	if (PageIsNew(page) || !DataChecksumsEnabled() || \
+		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
 		return (char *) page;
 
 	/*
@@ -1527,7 +1541,7 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 											 0);
 
 	memcpy(pageCopy, (char *) page, cluster_block_size);
-	((PageHeader) pageCopy)->pd_checksum = pg_checksum_page(pageCopy, blkno, cluster_block_size);
+	((PageHeader) pageCopy)->pd_feat.checksum = pg_checksum_page(pageCopy, blkno, cluster_block_size);
 	return pageCopy;
 }
 
@@ -1541,8 +1555,9 @@ void
 PageSetChecksumInplace(Page page, BlockNumber blkno)
 {
 	/* If we don't need a checksum, just return */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
+	if (PageIsNew(page) || !DataChecksumsEnabled() || \
+		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
 		return;
 
-	((PageHeader) page)->pd_checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
+	((PageHeader) page)->pd_feat.checksum = pg_checksum_page((char *) page, blkno, cluster_block_size);
 }

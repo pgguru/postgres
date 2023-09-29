@@ -70,6 +70,7 @@
 #include "common/blocksize.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"
+#include "common/pagefeat.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
@@ -90,6 +91,7 @@
 #include "storage/ipc.h"
 #include "storage/large_object.h"
 #include "storage/latch.h"
+#include "common/pagefeat.h"
 #include "storage/pmsignal.h"
 #include "storage/predicate.h"
 #include "storage/proc.h"
@@ -110,6 +112,7 @@
 #include "utils/varlena.h"
 
 extern uint32 bootstrap_data_checksum_version;
+extern PageFeatureSet bootstrap_page_features;
 
 /* timeline ID to be used when bootstrapping */
 #define BootstrapTimeLineID		1
@@ -3906,6 +3909,7 @@ InitControlFile(uint64 sysidentifier)
 	ControlFile->wal_log_hints = wal_log_hints;
 	ControlFile->track_commit_timestamp = track_commit_timestamp;
 	ControlFile->data_checksum_version = bootstrap_data_checksum_version;
+	ControlFile->page_features = bootstrap_page_features;
 }
 
 static void
@@ -4305,9 +4309,15 @@ ReadControlFile(void)
 
 	CalculateCheckpointSegments();
 
+	/* set our page-level space reservation from ControlFile if any extended feature flags are set*/
+	reserved_page_size = PageFeatureSetCalculateSize(ControlFile->page_features);
+	Assert(reserved_page_size == MAXALIGN(reserved_page_size));
+
 	/* Make the initdb settings visible as GUC variables, too */
 	SetConfigOption("data_checksums", DataChecksumsEnabled() ? "yes" : "no",
 					PGC_INTERNAL, PGC_S_DYNAMIC_DEFAULT);
+
+	SetExtendedFeatureConfigOptions(ControlFile->page_features);
 }
 
 /*

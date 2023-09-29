@@ -702,7 +702,7 @@ raw_heap_insert(RewriteState state, HeapTuple tup)
 	if (!state->rs_buffer_valid)
 	{
 		/* Initialize a new empty page */
-		PageInit(page, cluster_block_size, 0);
+		PageInit(page, cluster_block_size, 0, cluster_page_features);
 		state->rs_buffer_valid = true;
 	}
 
