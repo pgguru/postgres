@@ -659,7 +659,7 @@ vm_readbuf(Relation rel, BlockNumber blkno, bool extend)
 	{
 		LockBuffer(buf, BUFFER_LOCK_EXCLUSIVE);
 		if (PageIsNew(BufferGetPage(buf)))
-			PageInit(BufferGetPage(buf), cluster_block_size, 0);
+			PageInit(BufferGetPage(buf), cluster_block_size, 0, cluster_page_features);
 		LockBuffer(buf, BUFFER_LOCK_UNLOCK);
 	}
 	return buf;
