@@ -27,6 +27,7 @@
 #include "common/compression.h"
 #include "common/file_perm.h"
 #include "common/file_utils.h"
+#include "common/pagefeat.h"
 #include "lib/stringinfo.h"
 #include "miscadmin.h"
 #include "nodes/pg_list.h"
@@ -1487,7 +1488,7 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 	int			fd;
 	BlockNumber blkno = 0;
 	bool		block_retry = false;
-	uint16		checksum;
+	uint64		checksum, page_checksum;
 	int			checksum_failures = 0;
 	off_t		cnt;
 	int			i;
@@ -1595,9 +1596,23 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 				 */
 				if (!PageIsNew(page) && PageGetLSN(page) < sink->bbs_state->startptr)
 				{
-					checksum = pg_checksum_page((char *) page, blkno + segmentno * RELSEG_SIZE, cluster_block_size);
-					phdr = (PageHeader) page;
-					if (phdr->pd_feat.checksum != checksum)
+					char *extended_checksum_loc = NULL;
+
+					/* are we using extended checksums? */
+					if ((extended_checksum_loc = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS)))
+					{
+						/* 64-bit checksum */
+						page_checksum = pg_get_checksum64_page(page, cluster_block_size, (uint64*)extended_checksum_loc);
+						checksum = pg_checksum64_page(page, blkno + segmentno * RELSEG_SIZE, cluster_block_size, (uint64*)extended_checksum_loc);
+					}
+					else
+					{
+						phdr = (PageHeader) page;
+						page_checksum = phdr->pd_feat.checksum;
+						checksum = pg_checksum_page(page, blkno + segmentno * RELSEG_SIZE, cluster_block_size);
+					}
+
+					if (page_checksum != checksum)
 					{
 						/*
 						 * Retry the block on the first failure.  It's
@@ -1658,9 +1673,9 @@ sendFile(bbsink *sink, const char *readfilename, const char *tarfilename,
 							ereport(WARNING,
 									(errmsg("checksum verification failed in "
 											"file \"%s\", block %u: calculated "
-											"%X but expected %X",
+											UINT64_FORMAT " but expected " UINT64_FORMAT,
 											readfilename, blkno, checksum,
-											phdr->pd_feat.checksum)));
+											page_checksum)));
 						if (checksum_failures == 5)
 							ereport(WARNING,
 									(errmsg("further checksum verification "

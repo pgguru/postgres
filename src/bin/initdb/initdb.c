@@ -165,6 +165,7 @@ static bool sync_only = false;
 static bool show_setting = false;
 static bool data_checksums = false;
 static bool using_page_feats = false;
+static bool extended_checksums = false;
 static char *xlog_dir = NULL;
 static int	wal_segment_size_mb = (DEFAULT_XLOG_SEG_SIZE) / (1024 * 1024);
 static DataDirSyncMethod sync_method = DATA_DIR_SYNC_METHOD_FSYNC;
@@ -1547,6 +1548,8 @@ bootstrap_template1(void)
 	appendPQExpBuffer(&cmd, " -b %d:%d", block_size, cluster_reserved_page_size);
 	if (data_checksums)
 		appendPQExpBuffer(&cmd, " -k");
+	if (extended_checksums)
+		appendPQExpBuffer(&cmd, " -e extended_checksums");
 	if (debug)
 		appendPQExpBuffer(&cmd, " -d 5");
 
@@ -2450,6 +2453,7 @@ usage(const char *progname)
 	printf(_("      --icu-locale=LOCALE   set ICU locale ID for new databases\n"));
 	printf(_("      --icu-rules=RULES     set additional ICU collation rules for new databases\n"));
 	printf(_("  -k, --data-checksums      use data page checksums\n"));
+	printf(_("      --extended-checksums  use extended data page checksums\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
 	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
 			 "      --lc-monetary=, --lc-numeric=, --lc-time=LOCALE\n"
@@ -3112,6 +3116,7 @@ main(int argc, char *argv[])
 		{"block-size", required_argument, NULL, 'b'},
 		{"reserved-size", required_argument, NULL, 19},
 		{"data-checksums", no_argument, NULL, 'k'},
+		{"extended-checksums", no_argument, NULL, 20},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
 		{"locale-provider", required_argument, NULL, 15},
@@ -3232,6 +3237,10 @@ main(int argc, char *argv[])
 				break;
 			case 'k':
 				data_checksums = true;
+				break;
+			case 20:
+				extended_checksums = true;
+				using_page_feats = true;
 				break;
 			case 'L':
 				share_path = pg_strdup(optarg);
@@ -3364,6 +3373,9 @@ main(int argc, char *argv[])
 	if (pwprompt && pwfilename)
 		pg_fatal("password prompt and password file cannot be specified together");
 
+	if (data_checksums && extended_checksums)
+		pg_fatal("data checksums and extended data checksums cannot be specified together");
+
 	check_authmethod_unspecified(&authmethodlocal);
 	check_authmethod_unspecified(&authmethodhost);
 
@@ -3430,7 +3442,9 @@ main(int argc, char *argv[])
 	if (data_checksums && using_page_feats)
 		pg_fatal("cannot use page features and data_checksums at the same time");
 
-	if (data_checksums)
+	if (extended_checksums)
+		printf(_("Extended data page checksums are enabled.\n"));
+	else if (data_checksums)
 		printf(_("Data page checksums are enabled.\n"));
 	else
 		printf(_("Data page checksums are disabled.\n"));

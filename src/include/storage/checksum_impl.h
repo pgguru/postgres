@@ -102,6 +102,7 @@
 
 #include "storage/bufpage.h"
 #include "common/blocksize.h"
+#include "common/komihash.h"
 
 /* number of checksums to calculate in parallel */
 #define N_SUMS 32
@@ -215,3 +216,91 @@ pg_checksum_page(char *page, BlockNumber blkno, Size pagesize)
 	 */
 	return (uint16) ((checksum % 65535) + 1);
 }
+
+
+/*
+ * 64-bit block checksum algorithm.  The page must be adequately aligned
+ * (on an 8-byte boundary).
+ */
+
+static uint64
+pg_checksum64_block(const PGChecksummablePage *page, Size blocksize)
+{
+	/* ensure that the size is compatible with the algorithm */
+	Assert(blocksize == cluster_block_size);
+
+	return (uint64)komihash(page, cluster_block_size, 0);
+}
+
+/*
+ * Compute and return a 64-bit checksum for a Postgres page.
+ *
+ * Beware that the 64-bit portion of the page that cksum points to is
+ * transiently zeroed, though it is restored.
+ *
+ * The checksum includes the block number (to detect the case where a page is
+ * somehow moved to a different location), the page header (excluding the
+ * checksum itself), and the page data.
+ */
+uint64
+pg_checksum64_page(char *page, BlockNumber blkno, Size blocksize, uint64 *cksumloc)
+{
+	PGChecksummablePage *cpage = (PGChecksummablePage *) page;
+	uint64      saved;
+	uint64      checksum;
+
+	/* We only calculate the checksum for properly-initialized pages */
+	Assert(!PageIsNew((Page) page));
+	/* Ensure that the cksum pointer is in the page range on this page */
+	Assert((char*)cksumloc >= page && (char*)cksumloc <= (page + cluster_block_size - sizeof(uint64)));
+
+	saved = *cksumloc;
+	*cksumloc = 0;
+
+	checksum = pg_checksum64_block(cpage, blocksize);
+
+	/* restore */
+	*cksumloc = saved;
+
+	/* Mix in the block number to detect transposed pages */
+	checksum ^= blkno;
+
+	/* ensure in the extremely unlikely case that we have non-zero return
+	 * value here; this does double-up on our coset for group 1 here, but it's
+	 * a nice property to preserve */
+	return (checksum == 0 ? 1 : checksum);
+}
+
+
+/*
+ * Set a 64-bit checksum onto a Postgres page.
+ *
+ */
+void
+pg_set_checksum64_page(char *page, Size blocksize, uint64 checksum, uint64 *cksumloc)
+{
+	/* Can only set the checksum for properly-initialized pages */
+	Assert(!PageIsNew((Page) page));
+
+	/* Ensure that the cksum pointer is in the page range on this page */
+	Assert((char*)cksumloc >= page && (char*)cksumloc <= (page + cluster_block_size - sizeof(uint64)));
+	*cksumloc = checksum;
+}
+
+/*
+ * Get the 64-bit checksum onto a Postgres page given the offset to the
+ * containing uint64.
+ */
+uint64
+pg_get_checksum64_page(char *page, Size blocksize, uint64 *cksumloc)
+{
+	/* Can only set the checksum for properly-initialized pages */
+	Assert(!PageIsNew((Page) page));
+
+	/* Ensure that the cksum pointer is in the page range on this page */
+	Assert((char*)cksumloc >= page && (char*)cksumloc <= (page + cluster_block_size - sizeof(uint64)));
+	Assert(MAXALIGN((uint64)cksumloc) == (uint64)cksumloc);
+
+	return *cksumloc;
+}
+
