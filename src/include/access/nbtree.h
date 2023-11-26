@@ -194,9 +194,9 @@ typedef struct BTMetaPageData
 	(int) (((size) - sizeof(BTPageOpaqueData)) /	\
 		   sizeof(ItemPointerData))
 #define ClusterMaxTIDsPerBTreePage \
-	CalcMaxTIDsPerBTreePage(BLCKSZ - SizeOfPageHeaderData)
+	CalcMaxTIDsPerBTreePage(PageUsableSpace)
 #define MaxTIDsPerBTreePageLimit \
-	CalcMaxTIDsPerBTreePage(BLCKSZ - SizeOfPageHeaderData)
+	CalcMaxTIDsPerBTreePage(PageUsableSpaceMax)
 
 /*
  * The leaf-page fillfactor defaults to 90% but is user-adjustable.

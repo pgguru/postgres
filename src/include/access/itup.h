@@ -173,7 +173,7 @@ index_getattr(IndexTuple tup, int attnum, TupleDesc tupleDesc, bool *isnull)
  */
 #define CalcMaxIndexTuplesPerPage(size)	((int) ((size) / \
 			(MAXALIGN(sizeof(IndexTupleData) + 1) + sizeof(ItemIdData))))
-#define ClusterMaxIndexTuplesPerPage CalcMaxIndexTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
-#define MaxIndexTuplesPerPageLimit CalcMaxIndexTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
+#define ClusterMaxIndexTuplesPerPage CalcMaxIndexTuplesPerPage(PageUsableSpace)
+#define MaxIndexTuplesPerPageLimit CalcMaxIndexTuplesPerPage(PageUsableSpaceMax)
 
 #endif							/* ITUP_H */

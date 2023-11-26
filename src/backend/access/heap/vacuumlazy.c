@@ -1301,7 +1301,7 @@ lazy_scan_new_or_empty(LVRelState *vacrel, Buffer buf, BlockNumber blkno,
 
 		if (GetRecordedFreeSpace(vacrel->rel, blkno) == 0)
 		{
-			freespace = BLCKSZ - SizeOfPageHeaderData;
+			freespace = PageUsableSpace;
 
 			RecordPageWithFreeSpace(vacrel->rel, blkno, freespace);
 		}
