@@ -111,10 +111,10 @@ typedef struct BloomOptions
  * all space in metapage.
  */
 typedef BlockNumber FreeBlockNumberArray[
-										 MAXALIGN_DOWN(
-													   BLCKSZ - SizeOfPageHeaderData - MAXALIGN(sizeof(BloomPageOpaqueData))
-													   - MAXALIGN(sizeof(uint16) * 2 + sizeof(uint32) + sizeof(BloomOptions))
-													   ) / sizeof(BlockNumber)
+	MAXALIGN_DOWN(
+		PageUsableSpaceMax - MAXALIGN(sizeof(BloomPageOpaqueData))
+		- MAXALIGN(sizeof(uint16) * 2 + sizeof(uint32) + sizeof(BloomOptions))
+		) / sizeof(BlockNumber)
 ];
 
 /* Metadata of bloom index */
@@ -150,7 +150,7 @@ typedef struct BloomState
 } BloomState;
 
 #define BloomPageGetFreeSpace(state, page) \
-	(BLCKSZ - MAXALIGN(SizeOfPageHeaderData) \
+	(PageUsableSpace \
 		- BloomPageGetMaxOffset(page) * (state)->sizeOfBloomTuple \
 		- MAXALIGN(sizeof(BloomPageOpaqueData)))
 

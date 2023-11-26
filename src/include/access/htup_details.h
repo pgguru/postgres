@@ -569,8 +569,8 @@ StaticAssertDecl(MaxOffsetNumber < SpecTokenOffsetNumber,
  * you can, say, fit 2 tuples of size ClusterMaxHeapTupleSize/2 on the same page.
  */
 #define CalcMaxHeapTupleSize(size)  (size - sizeof(ItemIdData))
-#define ClusterMaxHeapTupleSize CalcMaxHeapTupleSize(BLCKSZ - SizeOfPageHeaderData)
-#define MaxHeapTupleSizeLimit CalcMaxHeapTupleSize(BLCKSZ - SizeOfPageHeaderData)
+#define ClusterMaxHeapTupleSize CalcMaxHeapTupleSize(PageUsableSpace)
+#define MaxHeapTupleSizeLimit CalcMaxHeapTupleSize(PageUsableSpaceMax)
 #define MinHeapTupleSize  MAXALIGN(SizeofHeapTupleHeader)
 
 /*
@@ -599,8 +599,8 @@ StaticAssertDecl(MaxOffsetNumber < SpecTokenOffsetNumber,
  */
 #define CalcMaxHeapTuplesPerPage(size)	((int) ((size) / \
 			(MAXALIGN(SizeofHeapTupleHeader) + sizeof(ItemIdData))))
-#define ClusterMaxHeapTuplesPerPage CalcMaxHeapTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
-#define MaxHeapTuplesPerPageLimit CalcMaxHeapTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
+#define ClusterMaxHeapTuplesPerPage CalcMaxHeapTuplesPerPage(PageUsableSpace)
+#define MaxHeapTuplesPerPageLimit CalcMaxHeapTuplesPerPage(PageUsableSpaceMax)
 
 /*
  * MaxAttrSize is a somewhat arbitrary upper limit on the declared size of
