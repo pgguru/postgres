@@ -414,8 +414,7 @@ visibilitymap_count(Relation rel, BlockNumber *all_visible, BlockNumber *all_fro
 		 */
 		map = (uint64 *) PageGetContents(BufferGetPage(mapBuffer));
 
-		StaticAssertStmt(MAPSIZE % sizeof(uint64) == 0,
-						 "unsupported MAPSIZE");
+		Assert(MAPSIZE % sizeof(uint64) == 0);
 		if (all_frozen == NULL)
 		{
 			for (i = 0; i < MAPSIZE / sizeof(uint64); i++)

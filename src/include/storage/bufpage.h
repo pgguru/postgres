@@ -214,11 +214,11 @@ typedef PageHeaderData *PageHeader;
 #define SizeOfPageHeaderData (offsetof(PageHeaderData, pd_linp))
 
 /*
- * how much space is left after smgr's bookkeeping, etc
+ * how much space is left after smgr's bookkeeping, etc; should be MAXALIGN
  */
-#define PageUsableSpace (BLCKSZ - SizeOfPageHeaderData)
-StaticAssertDecl(PageUsableSpace == MAXALIGN(PageUsableSpace),
-				 "SizeOfPageHeaderData must be MAXALIGN'd");
+extern int ReservedPageSize;
+
+#define PageUsableSpace (BLCKSZ - SizeOfPageHeaderData - ReservedPageSize)
 #define PageUsableSpaceMax (BLCKSZ - SizeOfPageHeaderData)
 
 /*
@@ -317,7 +317,7 @@ PageSetPageSizeAndVersion(Page page, Size size, uint8 version)
 static inline uint16
 PageGetUsablePageSize(Page page)
 {
-	return PageGetPageSize(page) - SizeOfPageHeaderData;
+	return PageGetPageSize(page) - SizeOfPageHeaderData - ReservedPageSize;
 }
 
 /* ----------------
