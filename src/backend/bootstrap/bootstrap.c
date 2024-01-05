@@ -27,6 +27,7 @@
 #include "catalog/index.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
+#include "common/blocksize.h"
 #include "common/link-canary.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -217,10 +218,18 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	argv++;
 	argc--;
 
-	while ((flag = getopt(argc, argv, "B:c:d:D:Fkr:X:-:")) != -1)
+	while ((flag = getopt(argc, argv, "b:B:c:d:D:Fkr:X:-:")) != -1)
 	{
 		switch (flag)
 		{
+			case 'b':
+				bootstrap_reserved_page_size = strtol(optarg, NULL, 0);
+				if (!IsValidReservedPageSize(bootstrap_reserved_page_size))
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("invalid reserved page size: %s; must be multiple of 8 between 0 and 256",
+									optarg)));
+				break;
 			case 'B':
 				SetConfigOption("shared_buffers", optarg, PGC_POSTMASTER, PGC_S_ARGV);
 				break;
@@ -296,6 +305,8 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	if (!SelectConfigFiles(userDoption, progname))
 		proc_exit(1);
 
+	BlockSizeInit(BLCKSZ, bootstrap_reserved_page_size);
+
 	/*
 	 * Validate we have been given a reasonable-looking DataDir and change
 	 * into it
@@ -307,8 +318,6 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 
 	SetProcessingMode(BootstrapProcessing);
 	IgnoreSystemIndexes = true;
-
-	BlockSizeInit(BLCKSZ, bootstrap_reserved_page_size);
 
 	InitializeMaxBackends();
 
