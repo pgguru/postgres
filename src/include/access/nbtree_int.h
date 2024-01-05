@@ -186,7 +186,6 @@ typedef struct BTMetaPageData
 #define CalcMaxTIDsPerBTreePage(usablespace)			  \
 	(int) ((usablespace) - sizeof(BTPageOpaqueData) / \
 		   sizeof(ItemPointerData))
-#define ClusterMaxTIDsPerBTreePage (CalcMaxTIDsPerBTreePage(PageUsableSpace))
 #define MaxTIDsPerBTreePageLimit (CalcMaxTIDsPerBTreePage(PageUsableSpaceMax))
 
 #endif

@@ -42,7 +42,7 @@
 #include "utils/relmapper.h"
 
 uint32		bootstrap_data_checksum_version = 0;	/* No checksum */
-
+Size		bootstrap_reserved_page_size = 0;		/* No reserved size */
 
 static void CheckerModeMain(void);
 static void bootstrap_signals(void);
@@ -307,6 +307,8 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 
 	SetProcessingMode(BootstrapProcessing);
 	IgnoreSystemIndexes = true;
+
+	BlockSizeInit(BLCKSZ, bootstrap_reserved_page_size);
 
 	InitializeMaxBackends();
 

@@ -24,7 +24,7 @@
 	MAXALIGN_DOWN(((usablespace) - ((tuplesPerPage) * sizeof(ItemIdData))) \
 				  / (tuplesPerPage))
 
-#define MaximumBytesPerTuple(tuplesPerPage) CalcMaximumBytesPerTuple(PageUsableSpaceMax,tuplesPerPage)
+#define MaximumBytesPerTuple(tuplesPerPage) CalcMaximumBytesPerTuple(PageUsableSpace,tuplesPerPage)
 
 /*
  * These symbols control toaster activation.  If a tuple is larger than
@@ -91,7 +91,6 @@
 	 VARHDRSZ)
 
 #define TOAST_MAX_CHUNK_SIZE_LIMIT CalcToastMaxChunkSize(PageUsableSpaceMax)
-#define ClusterToastMaxChunkSize CalcToastMaxChunkSize(PageUsableSpace)
 
 /* ----------
  * heap_toast_insert_or_update -
