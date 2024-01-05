@@ -67,6 +67,7 @@
 #include "catalog/catversion.h"
 #include "catalog/pg_control.h"
 #include "catalog/pg_database.h"
+#include "common/blocksize.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"
 #include "executor/instrument.h"
@@ -4078,6 +4079,7 @@ WriteControlFile(void)
 	ControlFile->relseg_size = RELSEG_SIZE;
 	ControlFile->xlog_blcksz = XLOG_BLCKSZ;
 	ControlFile->xlog_seg_size = wal_segment_size;
+	ControlFile->reserved_page_size = ReservedPageSize;
 
 	ControlFile->nameDataLen = NAMEDATALEN;
 	ControlFile->indexMaxKeys = INDEX_MAX_KEYS;
@@ -4147,8 +4149,9 @@ ReadControlFile(void)
 	pg_crc32c	crc;
 	int			fd;
 	static char wal_segsz_str[20];
+	static char reserved_page_size_str[20];
 	int			r;
-
+	int reserved_page_size;
 	/*
 	 * Read data...
 	 */
@@ -4213,6 +4216,26 @@ ReadControlFile(void)
 	if (!EQ_CRC32C(crc, ControlFile->crc))
 		ereport(FATAL,
 				(errmsg("incorrect checksum in control file")));
+
+	/*
+	 * Block size computations affect a number of things that are later
+	 * checked, so ensure that we calculate as soon as CRC has been validated
+	 * before checking other things that may depend on it.
+	 */
+
+	reserved_page_size = ControlFile->reserved_page_size;
+
+	if (!IsValidReservedPageSize(reserved_page_size))
+		ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						errmsg_plural("Reserved Page Size must be a multiple of 8 between 0 and 256, but the control file specifies %d byte",
+									  "Reserved Page Size must be a multiple of 8 between 0 and 256, but the control file specifies %d bytes",
+									  reserved_page_size,
+									  reserved_page_size)));
+
+	BlockSizeInit(ControlFile->blcksz, reserved_page_size);
+	snprintf(reserved_page_size_str, sizeof(reserved_page_size_str), "%d", reserved_page_size);
+	SetConfigOption("reserved_page_size", reserved_page_size_str, PGC_INTERNAL,
+					PGC_S_DYNAMIC_DEFAULT);
 
 	/*
 	 * Do compatibility checking immediately.  If the database isn't
