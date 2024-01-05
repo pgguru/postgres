@@ -26,7 +26,6 @@
 /* GUC variable */
 bool		ignore_checksum_failure = false;
 
-int ReservedPageSize = 0;
 /* ----------------------------------------------------------------
  *						Page support functions
  * ----------------------------------------------------------------

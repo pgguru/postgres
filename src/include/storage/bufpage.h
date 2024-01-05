@@ -15,6 +15,7 @@
 #define BUFPAGE_H
 
 #include "access/xlogdefs.h"
+#include "common/blocksize.h"
 #include "storage/block.h"
 #include "storage/item.h"
 #include "storage/off.h"
@@ -216,8 +217,6 @@ typedef PageHeaderData *PageHeader;
 /*
  * how much space is left after smgr's bookkeeping, etc; should be MAXALIGN
  */
-extern int ReservedPageSize;
-
 #define PageUsableSpace (BLCKSZ - SizeOfPageHeaderData - ReservedPageSize)
 #define PageUsableSpaceMax (BLCKSZ - SizeOfPageHeaderData)
 
