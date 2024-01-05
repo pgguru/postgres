@@ -46,15 +46,15 @@ PageInit(Page page, Size pageSize, Size specialSize)
 	specialSize = MAXALIGN(specialSize);
 
 	Assert(pageSize == BLCKSZ);
-	Assert(pageSize > specialSize + SizeOfPageHeaderData);
+	Assert(pageSize > specialSize + SizeOfPageHeaderData + ReservedPageSize);
 
 	/* Make sure all fields of page are zero, as well as unused space */
 	MemSet(p, 0, pageSize);
 
 	p->pd_flags = 0;
 	p->pd_lower = SizeOfPageHeaderData;
-	p->pd_upper = pageSize - specialSize;
-	p->pd_special = pageSize - specialSize;
+	p->pd_upper = pageSize - specialSize - ReservedPageSize;
+	p->pd_special = pageSize - specialSize - ReservedPageSize;
 	PageSetPageSizeAndVersion(page, pageSize, PG_PAGE_LAYOUT_VERSION);
 	/* p->pd_prune_xid = InvalidTransactionId;		done by above MemSet */
 }

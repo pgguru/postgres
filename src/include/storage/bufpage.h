@@ -331,7 +331,7 @@ PageGetUsablePageSize(Page page)
 static inline uint16
 PageGetSpecialSize(Page page)
 {
-	return (PageGetPageSize(page) - ((PageHeader) page)->pd_special);
+	return (PageGetPageSize(page) - ((PageHeader) page)->pd_special - ReservedPageSize);
 }
 
 /*
