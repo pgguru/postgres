@@ -4276,9 +4276,9 @@ ReadControlFile(void)
 	if (ControlFile->toast_max_chunk_size != TOAST_MAX_CHUNK_SIZE)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-				 errdetail("The database cluster was initialized with TOAST_MAX_CHUNK_SIZE %d,"
-						   " but the server was compiled with TOAST_MAX_CHUNK_SIZE %d.",
-						   ControlFile->toast_max_chunk_size, (int) TOAST_MAX_CHUNK_SIZE),
+				 errdetail("The database cluster was initialized with ClusterToastMaxChunkSize %d,"
+						   " but the server was configured with ClusterToastMaxChunkSize %d.",
+						   ControlFile->toast_max_chunk_size, (int) ClusterToastMaxChunkSize),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->loblksize != LOBLKSIZE)
 		ereport(FATAL,

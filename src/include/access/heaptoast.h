@@ -70,13 +70,13 @@
 
 /*
  * When we store an oversize datum externally, we divide it into chunks
- * containing at most TOAST_MAX_CHUNK_SIZE data bytes.  This number *must*
+ * containing at most ClusterToastMaxChunkSize data bytes.  This number *must*
  * be small enough that the completed toast-table tuple (including the
  * ID and sequence fields and all overhead) will fit on a page.
  * The coding here sets the size on the theory that we want to fit
  * EXTERN_TUPLES_PER_PAGE tuples of maximum size onto a page.
  *
- * NB: Changing TOAST_MAX_CHUNK_SIZE requires an initdb.
+ * NB: Changing ClusterToastMaxChunkSize requires an initdb.
  */
 #define EXTERN_TUPLES_PER_PAGE	4	/* tweak only this */
 
@@ -91,7 +91,6 @@
 	 VARHDRSZ)
 
 #define TOAST_MAX_CHUNK_SIZE_LIMIT CalcToastMaxChunkSize(PageUsableSpaceMax)
-#define TOAST_MAX_CHUNK_SIZE CalcToastMaxChunkSize(PageUsableSpace)
 
 /* ----------
  * heap_toast_insert_or_update -
