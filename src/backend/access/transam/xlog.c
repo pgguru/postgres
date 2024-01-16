@@ -4185,7 +4185,7 @@ WriteControlFile(void)
 	ControlFile->nameDataLen = NAMEDATALEN;
 	ControlFile->indexMaxKeys = INDEX_MAX_KEYS;
 
-	ControlFile->toast_max_chunk_size = TOAST_MAX_CHUNK_SIZE;
+	ControlFile->toast_max_chunk_size = ClusterToastMaxChunkSize;
 	ControlFile->loblksize = LOBLKSIZE;
 
 	ControlFile->float8ByVal = FLOAT8PASSBYVAL;
@@ -4376,12 +4376,12 @@ ReadControlFile(void)
 						   " but the server was compiled with INDEX_MAX_KEYS %d.",
 						   ControlFile->indexMaxKeys, INDEX_MAX_KEYS),
 				 errhint("It looks like you need to recompile or initdb.")));
-	if (ControlFile->toast_max_chunk_size != TOAST_MAX_CHUNK_SIZE)
+	if (ControlFile->toast_max_chunk_size != ClusterToastMaxChunkSize)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-				 errdetail("The database cluster was initialized with TOAST_MAX_CHUNK_SIZE %d,"
-						   " but the server was compiled with TOAST_MAX_CHUNK_SIZE %d.",
-						   ControlFile->toast_max_chunk_size, (int) TOAST_MAX_CHUNK_SIZE),
+				 errdetail("The database cluster was initialized with ClusterToastMaxChunkSize %d,"
+						   " but the server was configured with ClusterToastMaxChunkSize %d.",
+						   ControlFile->toast_max_chunk_size, (int) ClusterToastMaxChunkSize),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->loblksize != LOBLKSIZE)
 		ereport(FATAL,

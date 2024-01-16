@@ -310,7 +310,7 @@ toast_save_datum(Relation rel, Datum value,
 		/*
 		 * Calculate the size of this chunk
 		 */
-		chunk_size = Min(TOAST_MAX_CHUNK_SIZE, data_todo);
+		chunk_size = Min(ClusterToastMaxChunkSize, data_todo);
 
 		/*
 		 * Build a tuple and store it
