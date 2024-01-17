@@ -310,6 +310,16 @@ PageSetPageSizeAndVersion(Page page, Size size, uint8 version)
 	((PageHeader) page)->pd_pagesize_version = size | version;
 }
 
+/*
+ * PageGetUsablePageSize
+ *		Returns the usable space on a page (from end of page header to reserved space)
+ */
+static inline uint16
+PageGetUsablePageSize(Page page)
+{
+	return PageGetPageSize(page) - SizeOfPageHeaderData;
+}
+
 /* ----------------
  *		page special data functions
  * ----------------
