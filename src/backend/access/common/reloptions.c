@@ -328,7 +328,8 @@ static relopt_int intRelOpts[] =
 			RELOPT_KIND_HEAP,
 			ShareUpdateExclusiveLock
 		},
-		TOAST_TUPLE_TARGET, 128, TOAST_TUPLE_TARGET_MAIN
+		/* NOTE: these limits are dynamically initialized */
+		0, 0, 0
 	},
 	{
 		{
@@ -585,6 +586,12 @@ update_dynamic_reloptions(void)
 
 	for (i = 0; intRelOpts[i].gen.name; i++)
 	{
+		if (strcmp("toast_tuple_target", intRelOpts[i].gen.name) == 0)
+		{
+			intRelOpts[i].min = 128;
+			intRelOpts[i].default_val = CalcMaximumBytesPerTuple(PageUsableSpace,TOAST_TUPLES_PER_PAGE);
+			intRelOpts[i].max = CalcMaximumBytesPerTuple(PageUsableSpace,TOAST_TUPLES_PER_PAGE_MAIN);
+		}
 	}
 }
 
