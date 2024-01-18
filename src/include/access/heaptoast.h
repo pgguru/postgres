@@ -20,10 +20,11 @@
 /*
  * Find the maximum size of a tuple if there are to be N tuples per page.
  */
-#define MaximumBytesPerTuple(tuplesPerPage) \
-	MAXALIGN_DOWN((BLCKSZ - \
-				   MAXALIGN(SizeOfPageHeaderData + (tuplesPerPage) * sizeof(ItemIdData))) \
+#define CalcMaximumBytesPerTuple(usablespace,tuplesPerPage)	\
+	MAXALIGN_DOWN(((usablespace) - ((tuplesPerPage) * sizeof(ItemIdData))) \
 				  / (tuplesPerPage))
+
+#define MaximumBytesPerTuple(tuplesPerPage) CalcMaximumBytesPerTuple(PageUsableSpaceMax,tuplesPerPage)
 
 /*
  * These symbols control toaster activation.  If a tuple is larger than
@@ -81,12 +82,16 @@
 
 #define EXTERN_TUPLE_MAX_SIZE	MaximumBytesPerTuple(EXTERN_TUPLES_PER_PAGE)
 
-#define TOAST_MAX_CHUNK_SIZE	\
-	(EXTERN_TUPLE_MAX_SIZE -							\
+
+#define CalcToastMaxChunkSize(usablespace)							\
+	(CalcMaximumBytesPerTuple(usablespace,EXTERN_TUPLES_PER_PAGE) - \
 	 MAXALIGN(SizeofHeapTupleHeader) -					\
 	 sizeof(Oid) -										\
 	 sizeof(int32) -									\
 	 VARHDRSZ)
+
+#define TOAST_MAX_CHUNK_SIZE_LIMIT CalcToastMaxChunkSize(PageUsableSpaceMax)
+#define TOAST_MAX_CHUNK_SIZE CalcToastMaxChunkSize(PageUsableSpace)
 
 /* ----------
  * heap_toast_insert_or_update -

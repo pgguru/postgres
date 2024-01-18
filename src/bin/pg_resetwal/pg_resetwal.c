@@ -695,7 +695,7 @@ GuessControlValues(void)
 	ControlFile.xlog_seg_size = DEFAULT_XLOG_SEG_SIZE;
 	ControlFile.nameDataLen = NAMEDATALEN;
 	ControlFile.indexMaxKeys = INDEX_MAX_KEYS;
-	ControlFile.toast_max_chunk_size = TOAST_MAX_CHUNK_SIZE;
+	ControlFile.toast_max_chunk_size = TOAST_MAX_CHUNK_SIZE_LIMIT;
 	ControlFile.loblksize = LOBLKSIZE;
 	ControlFile.float8ByVal = FLOAT8PASSBYVAL;
 
