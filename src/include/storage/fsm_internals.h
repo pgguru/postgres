@@ -60,6 +60,14 @@ typedef FSMPageData *FSMPage;
  */
 #define SlotsPerFSMPage LeafNodesPerPage
 
+/*
+ * MinSlotsPerFSMPage is required so we can properly choose the tree level
+ * based on the minimum known number of slots on the page; the actual number
+ * could be more, but is not a compile-time constant, so the FSM_TREE_DEPTH
+ * logic uses this value instead to make the compiler happy.
+ */
+#define MinSlotsPerFSMPage (BLCKSZ - SizeOfPageHeaderData - MaxReservedPageSize - offsetof(FSMPageData, fp_nodes) - NonLeafNodesPerPage)
+
 /* Prototypes for functions in fsmpage.c */
 extern int	fsm_search_avail(Buffer buf, uint8 minvalue, bool advancenext,
 							 bool exclusive_lock_held);

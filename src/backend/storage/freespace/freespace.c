@@ -72,7 +72,7 @@
  * this means that 4096 bytes is the smallest BLCKSZ that we can get away
  * with a 3-level tree, and 512 is the smallest we support.
  */
-#define FSM_TREE_DEPTH	((SlotsPerFSMPage >= 1626) ? 3 : 4)
+#define FSM_TREE_DEPTH	((MinSlotsPerFSMPage >= 1626) ? 3 : 4)
 
 #define FSM_ROOT_LEVEL	(FSM_TREE_DEPTH - 1)
 #define FSM_BOTTOM_LEVEL 0
