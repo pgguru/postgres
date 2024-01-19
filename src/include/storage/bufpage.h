@@ -37,10 +37,10 @@
  * |			 v pd_upper							  |
  * +-------------+------------------------------------+
  * |			 | tupleN ...                         |
- * +-------------+------------------+-----------------+
- * |	   ... tuple3 tuple2 tuple1 | "special space" |
- * +--------------------------------+-----------------+
- *									^ pd_special
+ * +-------------+------------------------+-----------+
+ * | ... tuple3 tuple2 tuple1 | "special" | reserved  |
+ * +--------------------------+-----------------------+
+ *                            ^ pd_special
  *
  * a page is full when nothing can be added between pd_lower and
  * pd_upper.
@@ -69,11 +69,18 @@
  *
  * AM-generic per-page information is kept in PageHeaderData.
  *
- * AM-specific per-page data (if any) is kept in the area marked "special
- * space"; each AM has an "opaque" structure defined somewhere that is
- * stored as the page trailer.  an access method should always
- * initialize its pages with PageInit and then set its own opaque
- * fields.
+ * Reserved page size is defined at initdb time and reserves the final bytes
+ * of each disk page for conditional feature use, for instance storing
+ * authenticated data or IVs for encryption.  If reserved page size is present
+ * (either through explicit allocation or through implicit definition via
+ * defined page features) then the special space offset will be adjusted to
+ * start not at the end of the block itself, but right before the MAXALIGN'd
+ * ReservedPageSize chunk at the end, which is allocated/managed using the
+ * page features mechanism.  This adjustment is done at PageInit() time
+ * transparently to the AM, which still uses the normal pd_special pointer to
+ * reference its opaque block.  The only difference here is that the
+ * pd_special field + sizeof(opaque structure) will not (necessarily) be the
+ * same as the heap block size, but instead BLCKSZ - ReservedPageSize.
  */
 
 typedef Pointer Page;
