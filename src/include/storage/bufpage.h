@@ -122,7 +122,7 @@ PageXLogRecPtrGet(PageXLogRecPtr val)
  *
  *		pd_lsn		- identifies xlog record for last change to this page.
  *		pd_feat     - union type, one of:
- *         checksum - page checksum, if checksums enabled.
+ *         checksum - page checksum, if legacy checksums are enabled.
  *         features - page features, if using extended feature flags.
  *		pd_flags	- flag bits.
  *		pd_lower	- offset to start of free space.
@@ -538,5 +538,6 @@ extern bool PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 									Item newtup, Size newsize);
 extern char *PageSetChecksumCopy(Page page, BlockNumber blkno);
 extern void PageSetChecksumInplace(Page page, BlockNumber blkno);
+extern bool PageIsChecksumValid(Page page, BlockNumber blkno);
 
 #endif							/* BUFPAGE_H */

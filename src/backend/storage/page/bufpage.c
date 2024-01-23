@@ -19,6 +19,7 @@
 #include "access/xlog.h"
 #include "pgstat.h"
 #include "storage/checksum.h"
+#include "common/checksum_helper.h"
 #include "utils/memdebug.h"
 #include "utils/memutils.h"
 
@@ -105,20 +106,12 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	bool		checksum_failure = false;
 	bool		header_sane = false;
 	bool		all_zeroes = false;
-	uint16		checksum = 0;
-
 	/*
 	 * Don't verify page data unless the page passes basic non-zero test
 	 */
 	if (!PageIsNew(page))
 	{
-		if (DataChecksumsEnabled() && !(p->pd_flags & PD_EXTENDED_FEATS))
-		{
-			checksum = pg_checksum_page((char *) page, blkno);
-
-			if (checksum != p->pd_feat.checksum)
-				checksum_failure = true;
-		}
+		checksum_failure = !PageIsChecksumValid(page, blkno);
 
 		/*
 		 * The following checks don't prove the header is correct, only that
@@ -161,8 +154,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		if ((flags & PIV_LOG_WARNING) != 0)
 			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
-					 errmsg("page verification failed, calculated checksum %u but expected %u",
-							checksum, p->pd_feat.checksum)));
+					 errmsg("page verification failed, calculated different checksums")));
 
 		if ((flags & PIV_REPORT_STAT) != 0)
 			pgstat_report_checksum_failure();
@@ -1524,8 +1516,7 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 	static char *pageCopy = NULL;
 
 	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled() || \
-		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
+	if (PageIsNew(page) || !DataChecksumsEnabled())
 		return (char *) page;
 
 	/*
@@ -1541,7 +1532,8 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 											 0);
 
 	memcpy(pageCopy, (char *) page, BLCKSZ);
-	((PageHeader) pageCopy)->pd_feat.checksum = pg_checksum_page(pageCopy, blkno);
+
+	PageSetChecksumInplace(pageCopy, blkno);
 	return pageCopy;
 }
 
@@ -1554,10 +1546,94 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 void
 PageSetChecksumInplace(Page page, BlockNumber blkno)
 {
+	pg_checksum_type method = DataChecksumsType();
+	char saved_context[PG_CHECKSUM_MAX_LENGTH];
+	pg_checksum_context ctx;
+	uint16 page_offset = 0;
+
 	/* If we don't need a checksum, just return */
-	if (PageIsNew(page) || !DataChecksumsEnabled() || \
-		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
+	if (PageIsNew(page) || method == CHECKSUM_TYPE_NONE)
 		return;
 
-	((PageHeader) page)->pd_feat.checksum = pg_checksum_page((char *) page, blkno);
+	/* quickie set legacy method here, it's in pd_feat.checksum */
+	if (method == CHECKSUM_TYPE_CRC16C)
+	{
+		((PageHeader)page)->pd_feat.checksum = pg_checksum_page((char *)page, blkno);
+		return;
+	}
+
+	/* otherwise we find and empty our offset, compute the checksum, and store */
+	page_offset = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS);
+
+	/* some sanity checking */
+	Assert(page_offset > 0 && page_offset <= BLCKSZ - PG_CHECKSUM_MAX_LENGTH);
+	Assert(PageFeatureDefaultFeatureSize(PF_EXT_CHECKSUMS) == PG_CHECKSUM_MAX_LENGTH);
+
+	/* save aside existing context and zero on-page */
+	memcpy(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH);
+	memset(page + page_offset, 0, PG_CHECKSUM_MAX_LENGTH);
+
+	/* compute the hash of this page, overwriting the page's stored version */
+	pg_checksum_init(&ctx, method);
+	pg_checksum_update(&ctx, (uint8*)page, BLCKSZ);
+
+	/* mix in the block number for transposition; we'll just use another checksum update here */
+	pg_checksum_update(&ctx, (uint8*)&blkno, sizeof(blkno));
+
+	/* this writes the final hash to the page itself in the proper location */
+	pg_checksum_final(&ctx, (uint8*)page + page_offset);
+}
+
+/*
+ * Return true iff the page's checksum matches the page or if checksums are
+ * not enabled.  Modifies page in place, so need to have a pin.
+ */
+bool
+PageIsChecksumValid(Page page, BlockNumber blkno)
+{
+	PageHeader	p = (PageHeader) page;
+	pg_checksum_type method = DataChecksumsType();
+	char saved_context[PG_CHECKSUM_MAX_LENGTH];
+	pg_checksum_context ctx;
+	bool matched;
+	uint16 	page_offset;
+
+	Assert(page != NULL);
+
+	if (method == CHECKSUM_TYPE_NONE)
+		return true;
+
+	/* check our legacy method here, it's in pd_feat.checksum */
+	if (method == CHECKSUM_TYPE_CRC16C)
+	{
+		uint16 checksum = pg_checksum_page((char *)page, blkno);
+		return checksum == p->pd_feat.checksum;
+	}
+
+	page_offset = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS);
+
+	/* some sanity checking */
+	Assert(page_offset > 0 && page_offset <= BLCKSZ - PG_CHECKSUM_MAX_LENGTH);
+	Assert(PageFeatureDefaultFeatureSize(PF_EXT_CHECKSUMS) == PG_CHECKSUM_MAX_LENGTH);
+
+	/* save aside existing context and zero on-page */
+	memcpy(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH);
+	memset(page + page_offset, 0, PG_CHECKSUM_MAX_LENGTH);
+
+	/* compute the hash of this page, overwriting the page's stored version */
+	pg_checksum_init(&ctx, method);
+	pg_checksum_update(&ctx, (uint8*)page, BLCKSZ);
+
+	/* mix in the block number for transposition; we'll just use another checksum update here */
+	pg_checksum_update(&ctx, (uint8*)&blkno, sizeof(blkno));
+
+	pg_checksum_final(&ctx, (uint8*)page + page_offset);
+
+	/* compare to stored value */
+	matched = memcmp(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH) == 0;
+
+	/* restore saved value */
+	memcpy(page + page_offset, &saved_context, PG_CHECKSUM_MAX_LENGTH);
+
+	return matched;
 }
