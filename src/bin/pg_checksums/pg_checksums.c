@@ -559,6 +559,8 @@ main(int argc, char *argv[])
 							ControlFile->blcksz, BLCKSZ);
 		exit(1);
 	}
+	if (ControlFile->page_features[0] != '\0')
+		pg_fatal("pg_checksums cannot be used on a cluster with enabled page features");
 
 	/*
 	 * Check if cluster is running.  A clean shutdown is required to avoid

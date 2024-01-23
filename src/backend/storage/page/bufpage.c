@@ -44,13 +44,27 @@ PageInit(Page page, Size pageSize, Size specialSize)
 
 	specialSize = MAXALIGN(specialSize);
 
+#ifdef USE_ASSERT_CHECKING
+	if (HAS_PAGE_FEATURES)
+	{
+		Size reserved_size = PageFeatureSetCalculateSize(cluster_page_features);
+		Assert(reserved_size == MAXALIGN(reserved_size));
+		/* initdb ensured that ReservedPageSize should already be less than the page feature size, but be on the safe size and confirm it here. */
+		Assert(reserved_size <= ReservedPageSize);
+	}
+#endif /* USE_ASSERT_CHECKING */
+
 	Assert(pageSize == BLCKSZ);
 	Assert(pageSize > specialSize + SizeOfPageHeaderData + ReservedPageSize);
 
 	/* Make sure all fields of page are zero, as well as unused space */
 	MemSet(p, 0, pageSize);
 
-	p->pd_flags = 0;
+	if (HAS_PAGE_FEATURES)
+	{
+		p->pd_flags = PD_EXTENDED_FEATS;
+		p->pd_feat.features = cluster_page_features->builtin_bitmap;
+	}
 	p->pd_lower = SizeOfPageHeaderData;
 	p->pd_upper = pageSize - specialSize - ReservedPageSize;
 	p->pd_special = pageSize - specialSize - ReservedPageSize;

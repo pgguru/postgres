@@ -235,6 +235,7 @@ static const char *const subdirs[] = {
 	"pg_commit_ts",
 	"pg_dynshmem",
 	"pg_notify",
+	"pg_pagefeat",
 	"pg_serial",
 	"pg_snapshots",
 	"pg_subtrans",
@@ -276,6 +277,7 @@ static void write_version_file(const char *extrapath);
 static void set_null_conf(void);
 static void test_config_settings(void);
 static bool test_specific_config_settings(int test_conns, int test_buffs);
+static void write_page_features(void);
 static void setup_config(void);
 static void bootstrap_template1(void);
 static void setup_auth(FILE *cmdfd);
@@ -1506,6 +1508,22 @@ setup_config(void)
 
 
 /*
+ * check for any page features, and write out our persistent file if so
+ */
+static void
+write_page_features(void)
+{
+	char path[MAXPGPATH];
+
+	if (!HAS_PAGE_FEATURES)
+		return;
+
+	snprintf(path, sizeof(path), "%s/pg_pagefeat/%s", pg_data, cluster_page_features->name);
+
+	WritePageFeatureSet(cluster_page_features, path);
+}
+
+/*
  * run the BKI script in bootstrap mode to create template1
  */
 static void
@@ -1583,6 +1601,8 @@ bootstrap_template1(void)
 		appendPQExpBuffer(&cmd, " -b %d", reserved_page_size);
 	if (data_checksums)
 		appendPQExpBuffer(&cmd, " -k");
+	if (HAS_PAGE_FEATURES)
+		appendPQExpBuffer(&cmd, " -e %s", cluster_page_features->name);
 	if (debug)
 		appendPQExpBuffer(&cmd, " -d 5");
 
@@ -3051,6 +3071,9 @@ initialize_data_directory(void)
 	/* Now create all the text config files */
 	setup_config();
 
+	/* Create the page features files */
+	write_page_features();
+
 	/* Bootstrap template1 */
 	bootstrap_template1();
 
@@ -3194,6 +3217,8 @@ main(int argc, char *argv[])
 			exit(0);
 		}
 	}
+
+	cluster_page_features = NewPageFeatureSet("default", MaxReservedPageSize, MAX_PAGE_FEATURES);
 
 	/* process command-line options */
 
@@ -3408,6 +3433,10 @@ main(int argc, char *argv[])
 
 	if (!IsValidWalSegSize(wal_segment_size_mb * 1024 * 1024))
 		pg_fatal("argument of %s must be a power of two between 1 and 1024", "--wal-segsize");
+
+	/* check for incompatible extended features */
+	if (HAS_PAGE_FEATURES && data_checksums)
+		pg_fatal("cannot use page features and data_checksums at the same time");
 
 	if (str_reserved_page_size == NULL)
 		reserved_page_size = 0;

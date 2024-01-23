@@ -43,7 +43,10 @@
 #include "utils/relmapper.h"
 
 uint32		bootstrap_data_checksum_version = 0;	/* No checksum */
-Size		bootstrap_reserved_page_size = 0;		/* No reserved size */
+uint32		bootstrap_reserved_page_size = 0;
+
+char bootstrap_page_features_storage[PAGE_FEATURE_NAME_LEN] = {0};
+char *bootstrap_page_features = bootstrap_page_features_storage;
 
 static void CheckerModeMain(void);
 static void bootstrap_signals(void);
@@ -218,7 +221,7 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	argv++;
 	argc--;
 
-	while ((flag = getopt(argc, argv, "b:B:c:d:D:Fkr:X:-:")) != -1)
+	while ((flag = getopt(argc, argv, "b:B:c:d:D:e:Fkr:X:-:")) != -1)
 	{
 		switch (flag)
 		{
@@ -275,6 +278,10 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 					pfree(debugstr);
 				}
 				break;
+			case 'e':
+				/* name of the page features file to use */
+				strncpy(bootstrap_page_features,optarg,PAGE_FEATURE_NAME_LEN - 1);
+				break;
 			case 'F':
 				SetConfigOption("fsync", "false", PGC_POSTMASTER, PGC_S_ARGV);
 				break;
@@ -313,6 +320,9 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	 */
 	checkDataDir();
 	ChangeToDataDir();
+
+	/* if we had page features defined, let's go ahead and initialize them now */
+	ClusterPageFeatureInit(DataDir,bootstrap_page_features);
 
 	CreateDataDirLockFile(false);
 

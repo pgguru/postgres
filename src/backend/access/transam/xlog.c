@@ -106,6 +106,7 @@
 #include "utils/varlena.h"
 
 extern uint32 bootstrap_data_checksum_version;
+extern char *bootstrap_page_features;
 
 /* timeline ID to be used when bootstrapping */
 #define BootstrapTimeLineID		1
@@ -4160,6 +4161,7 @@ InitControlFile(uint64 sysidentifier)
 	ControlFile->wal_log_hints = wal_log_hints;
 	ControlFile->track_commit_timestamp = track_commit_timestamp;
 	ControlFile->data_checksum_version = bootstrap_data_checksum_version;
+	memcpy(ControlFile->page_features, bootstrap_page_features, PAGE_FEATURE_NAME_LEN);
 }
 
 static void
@@ -4458,9 +4460,14 @@ ReadControlFile(void)
 
 	CalculateCheckpointSegments();
 
+	ClusterPageFeatureInit(DataDir, ControlFile->page_features);
+
 	/* Make the initdb settings visible as GUC variables, too */
 	SetConfigOption("data_checksums", DataChecksumsEnabled() ? "yes" : "no",
 					PGC_INTERNAL, PGC_S_DYNAMIC_DEFAULT);
+
+	/* expose extended features as GUCs */
+	SetExtendedFeatureConfigOptions();
 }
 
 /*
