@@ -98,7 +98,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	 */
 	if (!PageIsNew(page))
 	{
-		if (DataChecksumsEnabled())
+		if (DataChecksumsEnabled() && !(p->pd_flags & PD_EXTENDED_FEATS))
 		{
 			checksum = pg_checksum_page((char *) page, blkno);
 
@@ -1510,7 +1510,8 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 	static char *pageCopy = NULL;
 
 	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
+	if (PageIsNew(page) || !DataChecksumsEnabled() || \
+		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
 		return (char *) page;
 
 	/*
@@ -1540,7 +1541,8 @@ void
 PageSetChecksumInplace(Page page, BlockNumber blkno)
 {
 	/* If we don't need a checksum, just return */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
+	if (PageIsNew(page) || !DataChecksumsEnabled() || \
+		(((PageHeader)page)->pd_flags & PD_EXTENDED_FEATS))
 		return;
 
 	((PageHeader) page)->pd_feat.checksum = pg_checksum_page((char *) page, blkno);
