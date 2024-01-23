@@ -16,6 +16,7 @@
 
 #include "access/xlogdefs.h"
 #include "common/blocksize.h"
+#include "common/pagefeat.h"
 #include "storage/block.h"
 #include "storage/item.h"
 #include "storage/off.h"

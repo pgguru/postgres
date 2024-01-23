@@ -19,10 +19,10 @@
 #include "access/xlogdefs.h"
 #include "pgtime.h"				/* for pg_time_t */
 #include "port/pg_crc32c.h"
-
+#include "common/pagefeat.h"
 
 /* Version identifier for this pg_control format */
-#define PG_CONTROL_VERSION	1700
+#define PG_CONTROL_VERSION	1701
 
 /* Nonce key length, see below */
 #define MOCK_AUTH_NONCE_LEN		32
@@ -219,6 +219,9 @@ typedef struct ControlFileData
 
 	/* Are data pages protected by checksums? Zero if no checksum version */
 	uint32		data_checksum_version;
+
+	/* which named page feature set are we using? */
+	char         page_features[20];
 
 	/*
 	 * Random nonce, used in authentication requests that need to proceed

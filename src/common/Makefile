@@ -67,6 +67,7 @@ OBJS_COMMON = \
 	link-canary.o \
 	md5_common.o \
 	parse_manifest.o \
+	pagefeat.o \
 	percentrepl.o \
 	pg_get_line.o \
 	pg_lzcompress.o \

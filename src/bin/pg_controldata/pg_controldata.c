@@ -224,6 +224,8 @@ main(int argc, char *argv[])
 		snprintf(&mock_auth_nonce_str[i * 2], 3, "%02x",
 				 (unsigned char) ControlFile->mock_authentication_nonce[i]);
 
+	ClusterPageFeatureInit(DataDir, ControlFile->page_features);
+
 	printf(_("pg_control version number:            %u\n"),
 		   ControlFile->pg_control_version);
 	printf(_("Catalog version number:               %u\n"),
@@ -329,5 +331,7 @@ main(int argc, char *argv[])
 		   ControlFile->data_checksum_version);
 	printf(_("Mock authentication nonce:            %s\n"),
 		   mock_auth_nonce_str);
+	printf(_("Reserved page size for features:      %d\n"),
+		   PageFeatureSetCalculateSize(cluster_page_features));
 	return 0;
 }
