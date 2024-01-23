@@ -32,6 +32,8 @@ pg_checksum_parse_type(char *name, pg_checksum_type *type)
 
 	if (pg_strcasecmp(name, "none") == 0)
 		result_type = CHECKSUM_TYPE_NONE;
+	else if (pg_strcasecmp(name, "crc16c") == 0)
+		result_type = CHECKSUM_TYPE_CRC16C;
 	else if (pg_strcasecmp(name, "crc32c") == 0)
 		result_type = CHECKSUM_TYPE_CRC32C;
 	else if (pg_strcasecmp(name, "sha224") == 0)
@@ -59,6 +61,8 @@ pg_checksum_type_name(pg_checksum_type type)
 	{
 		case CHECKSUM_TYPE_NONE:
 			return "NONE";
+		case CHECKSUM_TYPE_CRC16C:
+			return "CRC16C";
 		case CHECKSUM_TYPE_CRC32C:
 			return "CRC32C";
 		case CHECKSUM_TYPE_SHA224:
@@ -89,6 +93,7 @@ pg_checksum_init(pg_checksum_context *context, pg_checksum_type type)
 		case CHECKSUM_TYPE_NONE:
 			/* do nothing */
 			break;
+		case CHECKSUM_TYPE_CRC16C:
 		case CHECKSUM_TYPE_CRC32C:
 			INIT_CRC32C(context->raw_context.c_crc32c);
 			break;
@@ -150,6 +155,7 @@ pg_checksum_update(pg_checksum_context *context, const uint8 *input,
 		case CHECKSUM_TYPE_NONE:
 			/* do nothing */
 			break;
+		case CHECKSUM_TYPE_CRC16C:
 		case CHECKSUM_TYPE_CRC32C:
 			COMP_CRC32C(context->raw_context.c_crc32c, input, len);
 			break;
@@ -178,7 +184,7 @@ pg_checksum_final(pg_checksum_context *context, uint8 *output)
 	int			retval = 0;
 
 	StaticAssertDecl(sizeof(pg_crc32c) <= PG_CHECKSUM_MAX_LENGTH,
-					 "CRC-32C digest too big for PG_CHECKSUM_MAX_LENGTH");
+					 "CRC-32C or CRC-16C digest too big for PG_CHECKSUM_MAX_LENGTH");
 	StaticAssertDecl(PG_SHA224_DIGEST_LENGTH <= PG_CHECKSUM_MAX_LENGTH,
 					 "SHA224 digest too big for PG_CHECKSUM_MAX_LENGTH");
 	StaticAssertDecl(PG_SHA256_DIGEST_LENGTH <= PG_CHECKSUM_MAX_LENGTH,
@@ -191,6 +197,22 @@ pg_checksum_final(pg_checksum_context *context, uint8 *output)
 	switch (context->type)
 	{
 		case CHECKSUM_TYPE_NONE:
+			break;
+		case CHECKSUM_TYPE_CRC16C:
+		    {
+				uint16 result;
+
+
+				FIN_CRC32C(context->raw_context.c_crc32c);
+				retval = sizeof(result);
+				/* NOTE: this needs the block number mixed in after this, so is
+				 * possible we'll end up with the wrong value by doing the modulus
+				 * here instead of at the caller site.  We are not actually
+				 * calling this directly, so might be moot; implementation
+				 * provided here for completeness. */
+				result = (context->raw_context.c_crc32c % 65535) + 1;
+				memcpy(output, &result, retval);
+			}
 			break;
 		case CHECKSUM_TYPE_CRC32C:
 			FIN_CRC32C(context->raw_context.c_crc32c);

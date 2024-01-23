@@ -25,10 +25,13 @@
  * much faster than any of the other algorithms. On the other hand, we omit
  * MD5 here because any new that does need a cryptographically strong checksum
  * should use something better.
+ *
+ * CHECKSUM_TYPE_CRC16C is the legacy postgres heap checksum calculation
  */
 typedef enum pg_checksum_type
 {
-	CHECKSUM_TYPE_NONE,
+	CHECKSUM_TYPE_NONE = 0,
+	CHECKSUM_TYPE_CRC16C,		/* historical pg version = 1 */
 	CHECKSUM_TYPE_CRC32C,
 	CHECKSUM_TYPE_SHA224,
 	CHECKSUM_TYPE_SHA256,
