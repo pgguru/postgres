@@ -33,6 +33,7 @@ PageFeatureSet cluster_page_features;
 #endif
 
 /* declarations for status GUCs */
+bool page_feature_extended_checksums;
 
 /*
  * A "page feature" is an optional cluster-defined additional data field that
@@ -74,6 +75,8 @@ PageFeatureSet cluster_page_features;
  * or the attempt to set the GUC will fail. */
 
 static PageFeatureDesc builtin_feature_descs[PF_MAX_FEATURE] = {
+	/* PF_EXT_CHECKSUMS */
+	{ "extended_checksums", 64 }, /* needs storage for up to 512 bits */
 };
 
 static void OptimizePageFeatureSet(PageFeatureSet pfs);

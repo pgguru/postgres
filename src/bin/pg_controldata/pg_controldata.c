@@ -333,5 +333,7 @@ main(int argc, char *argv[])
 		   mock_auth_nonce_str);
 	printf(_("Reserved page size for features:      %d\n"),
 		   PageFeatureSetCalculateSize(cluster_page_features));
+	printf(_("Extended checksum method:             %s\n"),
+		   pg_checksum_type_name(ControlFile->data_checksum_version));
 	return 0;
 }
