@@ -62,3 +62,155 @@ checksums are enabled.  Systems in Hot-Standby mode may benefit from hint bits
 being set, but with checksums enabled, a page cannot be dirtied after setting a
 hint bit (due to the torn page risk). So, it must wait for full-page images
 containing the hint bit updates to arrive from the primary.
+
+
+Page Features
+-------------
+
+As described above, the use and interpretation of checksums on the page level
+are conditional depending on whether any Page Features had been enabled at
+initdb time.
+
+A Page Feature is an optional boolean parameter that will allocate a fixed-size
+amount of space from the end of a Page. All enabled Page Features are known as
+a Page Feature Set, and the control file contains the cluster-wide initial
+state. Future work here could expand out which features are utilized.
+
+Changes to the Page structure itself involve a new `pd_flags` bit and, if set, a
+reinterpretation of the `pd_checksums` field as a copy of this Page's enabled
+page features. This gives us both a sanity-check against the pg_control
+cluster_page_features as well as being a backwards-compatible change with
+existing disk pages with or without checksums enabled, meaning that pg_upgrade
+should work still.
+
+Future upgrades for clusters using Page Features should continue to work, as
+long as the initdb options for the future clusters are still compatible and as
+long as we keep the set of existing Page Features well-defined in terms of bit
+offsets and reserved length. (This does not seem like an unreasonable
+restriction.)
+
+Since we are taking over the pd_checksums field on the Page structure when Page
+Features are in use, it would seem that this would introduce some potential data
+corruption concerns, however one of the available page features is an extended
+checksum, which itself obviates the need for the checksums field and expands the
+available storage space for this checksum to a full 64-bits. This should be
+sufficient to address this concern, and the checksum-related code paths have
+already been updated to handle either the standard checksums or the extended
+checksums transparently.
+
+In addition to extended checksums, there is also a Page Feature which we use to
+store the GCM tag for authenticated encryption for TDE. This reserved space
+provides both storage and validation of Additional Authenticated Data so we can
+be sure that if a page decrypts appropriately is is cryptographically impossible
+to have twiddled any bits on this page outside of through Postgres itself, which
+serves as a stronger alternative to the checksum validation. The encryption
+tags and the extended checksums would both have validation guarantees, so there
+is no need for a cluster to include both (and in fact combining them makes no
+sense) so the options are considered incompatible.
+
+
+Builtin Page Features vs Named Page Features
+--------------------------------------------
+
+There is utility in being able to define page features as fairly arbitrary
+blocks of data in the given page, and many page features which just need some
+page-level storage won't care about their exact positioning in the actual layout
+of the page.  Some features, however will care.  These include extended
+checksums and/or page-level encryption, where the consistent position/offset of
+the data is required in order to properly interpret the page data and validate
+the structure.
+
+If a page feature does not care about its position, then you should use a named
+page feature.
+
+Page features can be added to PageFeatureSets at initdb time; this can either be
+through specialized logic inside initdb.c itself, or by utilizing the
+`--page-feat name=size` flag syntax to set the size for arbitrarily-named page
+features.
+
+Once the cluster has been created, the PageFeatureSet is considered locked; this
+is because once we have committed data to disk with the given PageFeatureSet, we
+can no longer make changes to the structure without breaking the interpretation
+of the reserved block. (An exception which would be allowed, but is not
+currently coded for, would be to add an additional page feature at runtime when
+the reserved space has been allocated at initdb time but not completely
+consumed.)
+
+
+Page Feature Map
+----------------
+
+In order to track the space usage, ControlFile stores the name of a map file in
+the pg_pagefeat directory.  This map file defines the name of each feature in
+use, the offset from the end of the block and the size of the block.  This file
+is created at initdb time and is effectively immutable for the cluster.
+
+The format of this is simple and easily verifiable:
+
+features 2 24
+foo=0,16
+bar=16,8
+
+There is a header line, "features N M" with N being the number of following
+features lines and M being the total bytes reserved for all features.  Then for
+each feature there is a line with the name, the offset, and the number of bytes.
+This is all cross-checked on read to ensure that the total number of features
+and size match up as well that the offset starts at the beginning of the block
+and there is no space in between.  Feature sizes are padded up to 8 bytes.
+
+When writing out the page feature map, any page features which are builtin are
+added first (and so appear in blocks at the end of the page) in the order of the
+builtins; this allows a page feature with the 0th index to always consistently
+know its location (though the page feature map allows you to query at runtime
+the offset and the size of a given page feature by name or by builtin enum).
+
+
+Developing new Page Features
+----------------------------
+
+If you are using a named page feature, there is nothing special you need to do
+in order to be able to utilize the PageFeatureSetAddFeatureByName() routine,
+which will do the right thing at initdb time.
+
+The goal of Page Features is to make it easy to have space-occupying optional
+features without it being a huge pain for developers to create new features,
+probe for the use of said features or to provide unnecessary boilerplate.
+
+As such, defining a new page feature consists of making changes to the following
+files:
+
+pagefeat.h:
+
+- create an `extern bool page_feature_<foo>` to expose the feature to the GUC
+  system.
+
+- a new feature flag should be defined for the feature; new features should
+  always be added at the end of the list since where these appear in the list
+  determines their relative offset in the page and features that already exist
+  in a cluster must appear at the same offset.
+
+pagefeat.c:
+
+- define the `bool page_feature_<foo>` variable to store the status field
+
+- add a new PageFeatureDesc entry to the corresponding index in the
+  `builtin_feature_descs` structure for this feature, including the default size
+  of space to be reserved and the name of the GUC to expose the status.
+
+guc_tables.c:
+
+- add a boolean computed field linking the variable name and the GUC name for
+  the feature.  Should be basically the same as any existing page feature GUC
+  such as "extended_checksums".
+
+initdb.c:
+
+- add whatever required getopt handling to optionally enable the feature at
+  initdb time.  If this is a builtin feature no additional size request is
+  required, but may be provided when using the PageFeatureSetAddFeature() or
+  PageFeatureSetAddFeatureByName() routines.
+
+- no additional changes are needed to pass things via bootstrap; the controlfile
+  contains the name of the file in pg_pagefeat that stores the page features for
+  this file.
+
