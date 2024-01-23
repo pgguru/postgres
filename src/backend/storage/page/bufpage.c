@@ -55,7 +55,6 @@ PageInit(Page page, Size pageSize, Size specialSize)
 	p->pd_upper = pageSize - specialSize - ReservedPageSize;
 	p->pd_special = pageSize - specialSize - ReservedPageSize;
 	PageSetPageSizeAndVersion(page, pageSize, PG_PAGE_LAYOUT_VERSION);
-	/* p->pd_prune_xid = InvalidTransactionId;		done by above MemSet */
 }
 
 
