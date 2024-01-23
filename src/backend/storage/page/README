@@ -3,6 +3,11 @@ src/backend/storage/page/README
 Checksums
 ---------
 
+Note: The description of the page checksums described in this section are
+relevant only when the database cluster has been initialized without page
+features; see the section on Page Features below for full details on
+interpretation.
+
 Checksums on data pages are designed to detect corruption by the I/O system.
 We do not protect buffers against uncorrectable memory errors, since these
 have a very low measured incidence according to research on large server farms,
@@ -19,7 +24,7 @@ We set the checksum on a buffer in the shared pool immediately before we
 flush the buffer. As a result we implicitly invalidate the page's checksum
 when we modify the page for a data change or even a hint. This means that
 many or even most pages in shared buffers have invalid page checksums,
-so be careful how you interpret the pd_checksum field.
+so be careful how you interpret the pd_feat.checksum field.
 
 That means that WAL-logged changes to a page do NOT update the page checksum,
 so full page images may not have a valid checksum. But those page images have

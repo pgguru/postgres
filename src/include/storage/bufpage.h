@@ -120,7 +120,9 @@ PageXLogRecPtrGet(PageXLogRecPtr val)
  * space management information generic to any page
  *
  *		pd_lsn		- identifies xlog record for last change to this page.
- *		pd_checksum - page checksum, if set.
+ *		pd_feat     - union type, one of:
+ *         checksum - page checksum, if checksums enabled.
+ *         features - page features, if using extended feature flags.
  *		pd_flags	- flag bits.
  *		pd_lower	- offset to start of free space.
  *		pd_upper	- offset to end of free space.
@@ -132,16 +134,18 @@ PageXLogRecPtrGet(PageXLogRecPtr val)
  * "thou shalt write xlog before data".  A dirty buffer cannot be dumped
  * to disk until xlog has been flushed at least as far as the page's LSN.
  *
- * pd_checksum stores the page checksum, if it has been set for this page;
- * zero is a valid value for a checksum. If a checksum is not in use then
- * we leave the field unset. This will typically mean the field is zero
- * though non-zero values may also be present if databases have been
- * pg_upgraded from releases prior to 9.3, when the same byte offset was
- * used to store the current timelineid when the page was last updated.
- * Note that there is no indication on a page as to whether the checksum
- * is valid or not, a deliberate design choice which avoids the problem
- * of relying on the page contents to decide whether to verify it. Hence
- * there are no flag bits relating to checksums.
+ * pd_feat is a union type; if the `PD_EXTENDED_FEATS` page flag is set, we
+ * interpret it as a bitflag storing information about the page features in
+ * use on this page.  If this flag is unset, then it stores the page checksum,
+ * if it has been set for this page; zero is a valid value for a checksum. If
+ * a checksum is not in use then we leave the field unset. This will typically
+ * mean the field is zero though non-zero values may also be present if
+ * databases have been pg_upgraded from releases prior to 9.3, when the same
+ * byte offset was used to store the current timelineid when the page was last
+ * updated.  Note that there is no indication on a page as to whether the
+ * checksum is valid or not, a deliberate design choice which avoids the
+ * problem of relying on the page contents to decide whether to verify
+ * it. Hence there are no flag bits relating to checksums.
  *
  * pd_prune_xid is a hint field that helps determine whether pruning will be
  * useful.  It is currently unused in index pages.
@@ -165,7 +169,10 @@ typedef struct PageHeaderData
 	/* XXX LSN is member of *any* block, not only page-organized ones */
 	PageXLogRecPtr pd_lsn;		/* LSN: next byte after last byte of xlog
 								 * record for last change to this page */
-	uint16		pd_checksum;	/* checksum */
+	union {
+		uint16		checksum;	/* checksum */
+		uint16		features;	/* page feature flags */
+	} pd_feat;
 	uint16		pd_flags;		/* flag bits, see below */
 	LocationIndex pd_lower;		/* offset to start of free space */
 	LocationIndex pd_upper;		/* offset to end of free space */

@@ -1890,7 +1890,7 @@ read_file_data_into_buffer(bbsink *sink, const char *readfilename, int fd,
 							"file \"%s\", block %u: calculated "
 							"%X but expected %X",
 							readfilename, blkno + i, expected_checksum,
-							((PageHeader) page)->pd_checksum)));
+							((PageHeader) page)->pd_feat.checksum)));
 		if (*checksum_failures == 5)
 			ereport(WARNING,
 					(errmsg("further checksum verification "
@@ -1981,7 +1981,7 @@ verify_page_checksum(Page page, XLogRecPtr start_lsn, BlockNumber blkno,
 
 	/* See whether it matches the value from the page. */
 	phdr = (PageHeader) page;
-	if (phdr->pd_checksum == checksum)
+	if (phdr->pd_feat.checksum == checksum)
 		return true;
 	*expected_checksum = checksum;
 	return false;

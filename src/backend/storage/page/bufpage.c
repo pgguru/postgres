@@ -102,7 +102,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 		{
 			checksum = pg_checksum_page((char *) page, blkno);
 
-			if (checksum != p->pd_checksum)
+			if (checksum != p->pd_feat.checksum)
 				checksum_failure = true;
 		}
 
@@ -148,7 +148,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 			ereport(WARNING,
 					(errcode(ERRCODE_DATA_CORRUPTED),
 					 errmsg("page verification failed, calculated checksum %u but expected %u",
-							checksum, p->pd_checksum)));
+							checksum, p->pd_feat.checksum)));
 
 		if ((flags & PIV_REPORT_STAT) != 0)
 			pgstat_report_checksum_failure();
@@ -1526,7 +1526,7 @@ PageSetChecksumCopy(Page page, BlockNumber blkno)
 											 0);
 
 	memcpy(pageCopy, (char *) page, BLCKSZ);
-	((PageHeader) pageCopy)->pd_checksum = pg_checksum_page(pageCopy, blkno);
+	((PageHeader) pageCopy)->pd_feat.checksum = pg_checksum_page(pageCopy, blkno);
 	return pageCopy;
 }
 
@@ -1543,5 +1543,5 @@ PageSetChecksumInplace(Page page, BlockNumber blkno)
 	if (PageIsNew(page) || !DataChecksumsEnabled())
 		return;
 
-	((PageHeader) page)->pd_checksum = pg_checksum_page((char *) page, blkno);
+	((PageHeader) page)->pd_feat.checksum = pg_checksum_page((char *) page, blkno);
 }
