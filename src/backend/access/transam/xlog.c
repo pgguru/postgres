@@ -4409,6 +4409,18 @@ DataChecksumsEnabled(void)
 }
 
 /*
+ * Map the data checksum to the method it uses; stub if we need to convert anything
+ */
+pg_checksum_type
+DataChecksumsType(void)
+{
+	Assert(ControlFile != NULL);
+	/* for now, just use the version directly, since 1 (pg_checksum legacy)
+	 * maps to checksum_helpers' lookup table */
+	return (pg_checksum_type)(ControlFile->data_checksum_version);
+}
+
+/*
  * Returns a fake LSN for unlogged relations.
  *
  * Each call generates an LSN that is greater than any previous value
