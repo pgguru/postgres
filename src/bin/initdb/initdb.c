@@ -170,6 +170,7 @@ static int	wal_segment_size_mb = (DEFAULT_XLOG_SEG_SIZE) / (1024 * 1024);
 static DataDirSyncMethod sync_method = DATA_DIR_SYNC_METHOD_FSYNC;
 static char *str_reserved_page_size = NULL;
 static int reserved_page_size = 0;
+static int required_page_feature_size = 0;
 
 
 /* internal vars */
@@ -3438,8 +3439,11 @@ main(int argc, char *argv[])
 	if (HAS_PAGE_FEATURES && data_checksums)
 		pg_fatal("cannot use page features and data_checksums at the same time");
 
+	required_page_feature_size = PageFeatureSetCalculateSize(cluster_page_features);
+
+	/* if not provided explicitly, use computed page feature size */
 	if (str_reserved_page_size == NULL)
-		reserved_page_size = 0;
+		reserved_page_size = required_page_feature_size;
 	else
 	{
 		char	   *endptr;
@@ -3453,6 +3457,11 @@ main(int argc, char *argv[])
 		/* check for valid block_size; last is bitwise power of two check */
 		if (!IsValidReservedPageSize(reserved_page_size))
 			pg_fatal("argument of --reserved-size must be a multiple of 8 between 0 and 256");
+
+		/* ensure we have at least as much space as our page features */
+		if (reserved_page_size < required_page_feature_size)
+			pg_fatal("argument of --reserved-size must be at least as large as the initdb-time page feature selection (currently: %d)", required_page_feature_size);
+
 		add_init_option_int("--reserved-size", reserved_page_size);
 	}
 
