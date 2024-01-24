@@ -70,6 +70,7 @@
 #include "catalog/pg_collation_d.h"
 #include "catalog/pg_database_d.h"	/* pgrminclude ignore */
 #include "common/blocksize.h"
+#include "common/checksum_helper.h"
 #include "common/file_perm.h"
 #include "common/file_utils.h"
 #include "common/logging.h"
@@ -165,6 +166,8 @@ static bool do_sync = true;
 static bool sync_only = false;
 static bool show_setting = false;
 static bool data_checksums = false;
+static bool extended_checksums = false;
+static pg_checksum_type checksum_type;
 static char *xlog_dir = NULL;
 static int	wal_segment_size_mb = (DEFAULT_XLOG_SEG_SIZE) / (1024 * 1024);
 static DataDirSyncMethod sync_method = DATA_DIR_SYNC_METHOD_FSYNC;
@@ -1604,8 +1607,8 @@ bootstrap_template1(void)
 
 	if (reserved_page_size)
 		appendPQExpBuffer(&cmd, " -b %d", reserved_page_size);
-	if (data_checksums)
-		appendPQExpBuffer(&cmd, " -k");
+	if (checksum_type != CHECKSUM_TYPE_NONE)
+		appendPQExpBuffer(&cmd, " -k %s", pg_checksum_type_name(checksum_type));
 	if (HAS_PAGE_FEATURES)
 		appendPQExpBuffer(&cmd, " -e %s", cluster_page_features->name);
 	if (debug)
@@ -2513,7 +2516,9 @@ usage(const char *progname)
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
 	printf(_("      --icu-locale=LOCALE   set ICU locale ID for new databases\n"));
 	printf(_("      --icu-rules=RULES     set additional ICU collation rules for new databases\n"));
-	printf(_("  -k, --data-checksums      use data page checksums\n"));
+	printf(_("  -k, --data-checksums      use legacy data page checksum method\n"));
+	printf(_("      --extended-checksums=METHOD\n"
+			 "                            use a specific method for data page checksums\n"));
 	printf(_("      --locale=LOCALE       set default locale for new databases\n"));
 	printf(_("      --lc-collate=, --lc-ctype=, --lc-messages=LOCALE\n"
 			 "      --lc-monetary=, --lc-numeric=, --lc-time=LOCALE\n"
@@ -3181,6 +3186,7 @@ main(int argc, char *argv[])
 		{"reserved-size", required_argument, NULL, 'b'},
 		{"data-checksums", no_argument, NULL, 'k'},
 		{"page-feature", required_argument, NULL, 'F'},
+		{"extended-checksums", required_argument, NULL, 20},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
 		{"locale-provider", required_argument, NULL, 15},
@@ -3335,6 +3341,23 @@ main(int argc, char *argv[])
 				break;
 			case 'k':
 				data_checksums = true;
+				checksum_type = CHECKSUM_TYPE_CRC16C;
+				break;
+			case 20:
+				{
+					int hash_size;
+					if (!pg_checksum_parse_type(optarg, &checksum_type))
+						pg_fatal("unrecognized extended checksum type: %s", optarg);
+					extended_checksums = true;
+					/* get native checksum size */
+					hash_size = pg_checksum_type_size(checksum_type);
+					if (hash_size > 0)
+					{
+						/* counts for both explicit NONE or invalid case */
+						if (!PageFeatureSetAddFeature(cluster_page_features, PF_EXT_CHECKSUMS, hash_size))
+							pg_fatal("error adding checksum feature");
+					}
+				}
 				break;
 			case 'L':
 				share_path = pg_strdup(optarg);
@@ -3536,7 +3559,9 @@ main(int argc, char *argv[])
 
 	printf("\n");
 
-	if (data_checksums)
+	if (extended_checksums)
+		printf(_("Extended data page checksums are enabled with method: %s.\n"), pg_checksum_type_name(checksum_type));
+	else if (data_checksums)
 		printf(_("Data page checksums are enabled.\n"));
 	else
 		printf(_("Data page checksums are disabled.\n"));

@@ -1549,7 +1549,7 @@ PageSetChecksumInplace(Page page, BlockNumber blkno)
 	pg_checksum_type method = DataChecksumsType();
 	char saved_context[PG_CHECKSUM_MAX_LENGTH];
 	pg_checksum_context ctx;
-	uint16 page_offset = 0;
+	uint16 page_offset, checksum_len;
 
 	/* If we don't need a checksum, just return */
 	if (PageIsNew(page) || method == CHECKSUM_TYPE_NONE)
@@ -1564,14 +1564,14 @@ PageSetChecksumInplace(Page page, BlockNumber blkno)
 
 	/* otherwise we find and empty our offset, compute the checksum, and store */
 	page_offset = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS);
+	checksum_len = PageGetFeatureSize(page, PF_EXT_CHECKSUMS);
 
 	/* some sanity checking */
-	Assert(page_offset > 0 && page_offset <= BLCKSZ - PG_CHECKSUM_MAX_LENGTH);
-	Assert(PageFeatureDefaultFeatureSize(PF_EXT_CHECKSUMS) == PG_CHECKSUM_MAX_LENGTH);
+	Assert(page_offset > 0 && page_offset <= BLCKSZ - checksum_len);
 
 	/* save aside existing context and zero on-page */
-	memcpy(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH);
-	memset(page + page_offset, 0, PG_CHECKSUM_MAX_LENGTH);
+	memcpy(&saved_context, page + page_offset, checksum_len);
+	memset(page + page_offset, 0, checksum_len);
 
 	/* compute the hash of this page, overwriting the page's stored version */
 	pg_checksum_init(&ctx, method);
@@ -1596,7 +1596,7 @@ PageIsChecksumValid(Page page, BlockNumber blkno)
 	char saved_context[PG_CHECKSUM_MAX_LENGTH];
 	pg_checksum_context ctx;
 	bool matched;
-	uint16 	page_offset;
+	uint16 	page_offset, checksum_len;
 
 	Assert(page != NULL);
 
@@ -1611,14 +1611,14 @@ PageIsChecksumValid(Page page, BlockNumber blkno)
 	}
 
 	page_offset = PageGetFeatureOffset(page, PF_EXT_CHECKSUMS);
+	checksum_len = PageGetFeatureSize(page, PF_EXT_CHECKSUMS);
 
 	/* some sanity checking */
-	Assert(page_offset > 0 && page_offset <= BLCKSZ - PG_CHECKSUM_MAX_LENGTH);
-	Assert(PageFeatureDefaultFeatureSize(PF_EXT_CHECKSUMS) == PG_CHECKSUM_MAX_LENGTH);
+	Assert(page_offset > 0 && page_offset <= BLCKSZ - checksum_len);
 
 	/* save aside existing context and zero on-page */
-	memcpy(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH);
-	memset(page + page_offset, 0, PG_CHECKSUM_MAX_LENGTH);
+	memcpy(&saved_context, page + page_offset, checksum_len);
+	memset(page + page_offset, 0, checksum_len);
 
 	/* compute the hash of this page, overwriting the page's stored version */
 	pg_checksum_init(&ctx, method);
@@ -1630,10 +1630,10 @@ PageIsChecksumValid(Page page, BlockNumber blkno)
 	pg_checksum_final(&ctx, (uint8*)page + page_offset);
 
 	/* compare to stored value */
-	matched = memcmp(&saved_context, page + page_offset, PG_CHECKSUM_MAX_LENGTH) == 0;
+	matched = memcmp(&saved_context, page + page_offset, checksum_len) == 0;
 
 	/* restore saved value */
-	memcpy(page + page_offset, &saved_context, PG_CHECKSUM_MAX_LENGTH);
+	memcpy(page + page_offset, &saved_context, checksum_len);
 
 	return matched;
 }

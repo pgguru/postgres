@@ -225,7 +225,7 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 	argv++;
 	argc--;
 
-	while ((flag = getopt(argc, argv, "b:B:c:d:D:e:Fkr:X:-:")) != -1)
+	while ((flag = getopt(argc, argv, "b:B:c:d:D:e:Fk:r:X:-:")) != -1)
 	{
 		switch (flag)
 		{
@@ -290,7 +290,10 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
 				SetConfigOption("fsync", "false", PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 			case 'k':
-				bootstrap_data_checksum_version = PG_DATA_CHECKSUM_VERSION;
+				if (!pg_checksum_parse_type(optarg, &bootstrap_data_checksum_version))
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("Unrecognized checksum type requested: \"%s\"", optarg)));
 				break;
 			case 'r':
 				strlcpy(OutputFileName, optarg, MAXPGPATH);
