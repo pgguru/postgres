@@ -66,6 +66,7 @@ typedef struct pg_checksum_context
 
 extern bool pg_checksum_parse_type(char *name, pg_checksum_type *);
 extern char *pg_checksum_type_name(pg_checksum_type);
+extern int pg_checksum_type_size(pg_checksum_type type);
 
 extern int	pg_checksum_init(pg_checksum_context *, pg_checksum_type);
 extern int	pg_checksum_update(pg_checksum_context *, const uint8 *input,

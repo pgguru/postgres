@@ -252,3 +252,28 @@ pg_checksum_final(pg_checksum_context *context, uint8 *output)
 	Assert(retval <= PG_CHECKSUM_MAX_LENGTH);
 	return retval;
 }
+
+/* helper to return the native size in bytes of a given checksum type, or -1 in case of error */
+int
+pg_checksum_type_size(pg_checksum_type type)
+{
+	switch (type)
+	{
+		case CHECKSUM_TYPE_NONE:
+			return 0;
+		case CHECKSUM_TYPE_CRC16C:
+			return sizeof(uint16);
+		case CHECKSUM_TYPE_CRC32C:
+			return sizeof(pg_crc32c);
+		case CHECKSUM_TYPE_SHA224:
+			return PG_SHA224_DIGEST_LENGTH;
+		case CHECKSUM_TYPE_SHA256:
+			return PG_SHA256_DIGEST_LENGTH;
+		case CHECKSUM_TYPE_SHA384:
+			return PG_SHA384_DIGEST_LENGTH;
+		case CHECKSUM_TYPE_SHA512:
+			return PG_SHA512_DIGEST_LENGTH;
+		default:
+			return -1;
+	}
+}
