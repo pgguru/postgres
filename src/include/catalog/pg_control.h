@@ -21,8 +21,12 @@
 #include "port/pg_crc32c.h"
 #include "common/pagefeat.h"
 
+#ifndef FRONTEND
+#include "port/atomics.h"
+#endif
+
 /* Version identifier for this pg_control format */
-#define PG_CONTROL_VERSION	1701
+#define PG_CONTROL_VERSION	1702
 
 /* Nonce key length, see below */
 #define MOCK_AUTH_NONCE_LEN		32
@@ -231,6 +235,15 @@ typedef struct ControlFileData
 	char		mock_authentication_nonce[MOCK_AUTH_NONCE_LEN];
 
 	uint32		reserved_page_size;	/* how much space per disk block is reserved */
+
+#ifdef FRONTEND
+	uint64 iv_counter;
+#else
+	pg_atomic_uint64      iv_counter;		/* internal counter used for our IV assignment */
+#endif
+	/* File encryption method;  index into encryption_methods[]. */
+	int		file_encryption_method;
+
 	/* CRC of all above ... MUST BE LAST! */
 	pg_crc32c	crc;
 } ControlFileData;

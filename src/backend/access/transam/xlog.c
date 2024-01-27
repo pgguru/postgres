@@ -4420,6 +4420,13 @@ DataChecksumsType(void)
 	return (pg_checksum_type)(ControlFile->data_checksum_version);
 }
 
+/* atomic increment operation on our iv counter */
+uint64
+IncrementIVCounter()
+{
+	return pg_atomic_fetch_add_u64(&ControlFile->iv_counter, 1);
+}
+
 /*
  * Returns a fake LSN for unlogged relations.
  *
@@ -5802,6 +5809,14 @@ StartupXLOG(void)
 		ereport(LOG,
 				(errmsg("archive recovery complete")));
 	}
+
+	/* increment our atomic iv_counter since it may have been used since the
+	 * last time, but now that we are past recovery replay it is safe to
+	 * increase to a value that has not been used. TODO: how do we handle in
+	 * the case of being a replica where the pg_control may not have been
+	 * updated? */
+	pg_atomic_write_u64(&ControlFile->iv_counter,
+						pg_atomic_read_u64(&ControlFile->iv_counter) + 1);
 
 	/* Save the selected TimeLineID in shared memory, too */
 	XLogCtl->InsertTimeLineID = newTLI;
