@@ -233,6 +233,7 @@ static pgsocket *ListenSockets = NULL;
 
 /* still more option variables */
 bool		EnableSSL = false;
+int			terminal_fd = -1;
 
 int			PreAuthDelay = 0;
 int			AuthenticationTimeout = 60;
@@ -696,7 +697,7 @@ PostmasterMain(int argc, char *argv[])
 	 * tcop/postgres.c (the option sets should not conflict) and with the
 	 * common help() function in main/main.c.
 	 */
-	while ((opt = getopt(argc, argv, "B:bC:c:D:d:EeFf:h:ijk:lN:OPp:r:S:sTt:W:-:")) != -1)
+	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijk:lN:OPp:r:R:S:sTt:W:-:")) != -1)
 	{
 		switch (opt)
 		{
@@ -807,6 +808,10 @@ PostmasterMain(int argc, char *argv[])
 
 			case 'r':
 				/* only used by single-user backend */
+				break;
+
+			case 'R':
+				terminal_fd = atoi(optarg);
 				break;
 
 			case 'S':
@@ -1350,6 +1355,9 @@ PostmasterMain(int argc, char *argv[])
 
 	InitializeKmgr();
 	InitializeBufferEncryption(GetFileEncryptionMethod());
+
+	if (terminal_fd != -1)
+		close(terminal_fd);
 
 	/*
 	 * check that we have some socket to listen on

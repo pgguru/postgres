@@ -78,6 +78,7 @@
 #include "port/atomics.h"
 #include "port/pg_iovec.h"
 #include "postmaster/bgwriter.h"
+#include "postmaster/postmaster.h"
 #include "postmaster/startup.h"
 #include "postmaster/walsummarizer.h"
 #include "postmaster/walwriter.h"
@@ -113,6 +114,7 @@
 
 extern uint32 bootstrap_data_checksum_version;
 extern char *bootstrap_page_features;
+extern int bootstrap_file_encryption_method;
 
 /* timeline ID to be used when bootstrapping */
 #define BootstrapTimeLineID		1
@@ -4060,6 +4062,7 @@ InitControlFile(uint64 sysidentifier)
 	ControlFile->wal_log_hints = wal_log_hints;
 	ControlFile->track_commit_timestamp = track_commit_timestamp;
 	ControlFile->data_checksum_version = bootstrap_data_checksum_version;
+	ControlFile->file_encryption_method = bootstrap_file_encryption_method;
 	memcpy(ControlFile->page_features, bootstrap_page_features, PAGE_FEATURE_NAME_LEN);
 }
 
@@ -4361,12 +4364,27 @@ ReadControlFile(void)
 
 	ClusterPageFeatureInit(DataDir, ControlFile->page_features);
 
+#if 0
+	/* tell page features about authtag size */
+	InitPageFeatures(GetFileEncryptionMethod());
+
+	/* set our page-level space reservation from ControlFile if any extended feature flags are set*/
+	reserved_page_size = PageFeatureSetCalculateSize(ControlFile->page_features);
+	Assert(reserved_page_size == MAXALIGN(reserved_page_size));
+#endif
+
 	/* Make the initdb settings visible as GUC variables, too */
 	SetConfigOption("data_checksums", DataChecksumsEnabled() ? "yes" : "no",
 					PGC_INTERNAL, PGC_S_DYNAMIC_DEFAULT);
 
 	/* expose extended features as GUCs */
 	SetExtendedFeatureConfigOptions();
+
+ 	StaticAssertStmt(lengthof(encryption_methods) == NUM_ENCRYPTION_METHODS,
+ 							 "encryption_methods[] must match NUM_ENCRYPTION_METHODS");
+ 	SetConfigOption("file_encryption_method",
+ 					encryption_methods[ControlFile->file_encryption_method].name,
+ 					PGC_INTERNAL, PGC_S_OVERRIDE);
 }
 
 /*
@@ -4426,6 +4444,21 @@ uint64
 IncrementIVCounter()
 {
 	return pg_atomic_fetch_add_u64(&ControlFile->iv_counter, 1);
+}
+
+/*
+ * Is cluster file encryption enabled?
+ */
+int
+GetFileEncryptionMethod(void)
+{
+	if (IsBootstrapProcessingMode())
+		return bootstrap_file_encryption_method;
+	else
+	{
+		Assert(ControlFile != NULL);
+		return ControlFile->file_encryption_method;
+	}
 }
 
 /*

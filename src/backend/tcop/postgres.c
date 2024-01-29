@@ -3799,7 +3799,7 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 	 * postmaster/postmaster.c (the option sets should not conflict) and with
 	 * the common help() function in main/main.c.
 	 */
-	while ((flag = getopt(argc, argv, "B:bC:c:D:d:EeFf:h:ijk:lN:nOPp:r:S:sTt:v:W:-:")) != -1)
+	while ((flag = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijk:lN:nOPp:r:R:S:sTt:v:W:-:")) != -1)
 	{
 		switch (flag)
 		{
@@ -3915,6 +3915,19 @@ process_postgres_switches(int argc, char *argv[], GucContext ctx,
 				/* send output (stdout and stderr) to the given file */
 				if (secure)
 					strlcpy(OutputFileName, optarg, MAXPGPATH);
+				break;
+
+			case 'R':
+				terminal_fd = atoi(optarg);
+				if (terminal_fd == -1)
+				{
+					/*
+					 * Allow file descriptor closing to be bypassed via -1.
+					 * We just duplicate sterr.  This is useful for
+					 * single-user mode.
+					 */
+					terminal_fd = dup(2);
+				}
 				break;
 
 			case 'S':
@@ -4145,6 +4158,8 @@ PostgresMain(const char *dbname, const char *username)
 		InitializeKmgr();
 		InitializeBufferEncryption(GetFileEncryptionMethod());
 
+		if (terminal_fd != -1)
+			close(terminal_fd);
 	}
 
 	/*
