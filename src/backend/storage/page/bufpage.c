@@ -17,6 +17,7 @@
 #include "access/htup_details.h"
 #include "access/itup.h"
 #include "access/xlog.h"
+#include "crypto/bufenc.h"
 #include "pgstat.h"
 #include "storage/checksum.h"
 #include "common/checksum_helper.h"
@@ -1636,4 +1637,59 @@ PageIsChecksumValid(Page page, BlockNumber blkno)
 	memcpy(page + page_offset, &saved_context, checksum_len);
 
 	return matched;
+}
+
+/* Function to support preparing a page for write, whatever that means. */
+/* Perhaps we could support some sort of extension hook here: TODO: some way of passing in the buffer tag instead of all of these params? */
+void
+PageWrapForWrite(Page page, ForkNumber forknum, bool relation_is_permanent,
+				BlockNumber blkno, RelFileNumber fileno)
+{
+	/* in practice checksums and encryption are mutually exclusive, but let's
+	 * set in the order we might want to keep anyway */
+
+	/* add our checksum */
+	PageSetChecksumInplace(page, blkno);
+
+	/* add our encrypt our page */
+	if (PageIsNew(page) || !PageNeedsToBeEncrypted(forknum))
+		return;
+
+	EncryptPage(page, relation_is_permanent, blkno, fileno);
+}
+
+/* return a private copy of a page that has been prepared for write */
+char *
+PageWrapForWriteCopy(Page page, ForkNumber forknum, bool relation_is_permanent,
+				BlockNumber blkno, RelFileNumber fileno)
+{
+	static char *pageCopy = NULL;
+
+	/*
+	 * We allocate the copy space once and use it over on each subsequent
+	 * call.  The point of palloc'ing here, rather than having a static char
+	 * array, is first to ensure adequate alignment for the checksumming code
+	 * and second to avoid wasting space in processes that never call this.
+	 */
+	if (pageCopy == NULL)
+		pageCopy = MemoryContextAllocAligned(TopMemoryContext,
+											 BLCKSZ,
+											 PG_IO_ALIGN_SIZE,
+											 0);
+
+	memcpy(pageCopy, (char *) page, BLCKSZ);
+
+	PageWrapForWrite(pageCopy,forknum,relation_is_permanent,blkno,fileno);
+	return pageCopy;
+}
+
+/* unwrap our read page and support any validation checks here */
+bool
+PageUnwrapFromRead(Page page, ForkNumber forknum, bool relation_is_permanent,
+				   BlockNumber blkno, RelFileNumber fileno)
+{
+	if (!PageIsNew(page) && PageNeedsToBeEncrypted(forknum))
+		DecryptPage(page, relation_is_permanent, blkno, fileno);
+
+	return PageIsChecksumValid(page,blkno);
 }

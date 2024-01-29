@@ -17,9 +17,11 @@
 #include "access/xlogdefs.h"
 #include "common/blocksize.h"
 #include "common/pagefeat.h"
+#include "common/relpath.h"
 #include "storage/block.h"
 #include "storage/item.h"
 #include "storage/off.h"
+#include "storage/relfilelocator.h"
 
 /*
  * A postgres disk page is an abstraction layered on top of a postgres
@@ -540,5 +542,11 @@ extern bool PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 extern char *PageSetChecksumCopy(Page page, BlockNumber blkno);
 extern void PageSetChecksumInplace(Page page, BlockNumber blkno);
 extern bool PageIsChecksumValid(Page page, BlockNumber blkno);
+extern void PageWrapForWrite(Page page, ForkNumber forknum, bool relation_is_permanent,
+					  BlockNumber blkno, RelFileNumber fileno);
+extern char *PageWrapForWriteCopy(Page page, ForkNumber forknum, bool relation_is_permanent,
+					  BlockNumber blkno, RelFileNumber fileno);
+extern bool PageUnwrapFromRead(Page page, ForkNumber forknum, bool relation_is_permanent,
+					  BlockNumber blkno, RelFileNumber fileno);
 
 #endif							/* BUFPAGE_H */
