@@ -28,6 +28,9 @@
 /* GUC variable */
 bool		ignore_checksum_failure = false;
 
+/* private routines */
+static void PageSetChecksumInplace(Page page, BlockNumber blkno);
+
 /* ----------------------------------------------------------------
  *						Page support functions
  * ----------------------------------------------------------------
@@ -1496,55 +1499,13 @@ PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 	return true;
 }
 
-
-/*
- * Set checksum for a page in shared buffers.
- *
- * If checksums are disabled, or if the page is not initialized, just return
- * the input.  Otherwise, we must make a copy of the page before calculating
- * the checksum, to prevent concurrent modifications (e.g. setting hint bits)
- * from making the final checksum invalid.  It doesn't matter if we include or
- * exclude hints during the copy, as long as we write a valid page and
- * associated checksum.
- *
- * Returns a pointer to the block-sized data that needs to be written. Uses
- * statically-allocated memory, so the caller must immediately write the
- * returned page and not refer to it again.
- */
-char *
-PageSetChecksumCopy(Page page, BlockNumber blkno)
-{
-	static char *pageCopy = NULL;
-
-	/* If we don't need a checksum, just return the passed-in data */
-	if (PageIsNew(page) || !DataChecksumsEnabled())
-		return (char *) page;
-
-	/*
-	 * We allocate the copy space once and use it over on each subsequent
-	 * call.  The point of palloc'ing here, rather than having a static char
-	 * array, is first to ensure adequate alignment for the checksumming code
-	 * and second to avoid wasting space in processes that never call this.
-	 */
-	if (pageCopy == NULL)
-		pageCopy = MemoryContextAllocAligned(TopMemoryContext,
-											 BLCKSZ,
-											 PG_IO_ALIGN_SIZE,
-											 0);
-
-	memcpy(pageCopy, (char *) page, BLCKSZ);
-
-	PageSetChecksumInplace(pageCopy, blkno);
-	return pageCopy;
-}
-
 /*
  * Set checksum for a page in private memory.
  *
  * This must only be used when we know that no other process can be modifying
  * the page buffer.
  */
-void
+static void
 PageSetChecksumInplace(Page page, BlockNumber blkno)
 {
 	pg_checksum_type method = DataChecksumsType();

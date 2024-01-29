@@ -539,8 +539,6 @@ extern void PageIndexMultiDelete(Page page, OffsetNumber *itemnos, int nitems);
 extern void PageIndexTupleDeleteNoCompact(Page page, OffsetNumber offnum);
 extern bool PageIndexTupleOverwrite(Page page, OffsetNumber offnum,
 									Item newtup, Size newsize);
-extern char *PageSetChecksumCopy(Page page, BlockNumber blkno);
-extern void PageSetChecksumInplace(Page page, BlockNumber blkno);
 extern bool PageIsChecksumValid(Page page, BlockNumber blkno);
 extern void PageWrapForWrite(Page page, ForkNumber forknum, bool relation_is_permanent,
 					  BlockNumber blkno, RelFileNumber fileno);
