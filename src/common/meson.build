@@ -17,6 +17,7 @@ common_sources = files(
   'ip.c',
   'jsonapi.c',
   'keywords.c',
+  'kmgr_utils.c',
   'kwlookup.c',
   'link-canary.c',
   'md5_common.c',
