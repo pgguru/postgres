@@ -26,6 +26,7 @@
 #include "access/xlogprefetcher.h"
 #include "access/xlogrecovery.h"
 #include "commands/async.h"
+#include "crypto/kmgr.h"
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "postmaster/autovacuum.h"
@@ -153,6 +154,7 @@ CalculateShmemSize(int *num_semaphores)
 	size = add_size(size, StatsShmemSize());
 	size = add_size(size, WaitEventExtensionShmemSize());
 	size = add_size(size, InjectionPointShmemSize());
+	size = add_size(size, KmgrShmemSize());
 #ifdef EXEC_BACKEND
 	size = add_size(size, ShmemBackendArraySize());
 #endif
@@ -357,6 +359,7 @@ CreateOrAttachShmemStructs(void)
 	StatsShmemInit();
 	WaitEventExtensionShmemInit();
 	InjectionPointShmemInit();
+ 	KmgrShmemInit();
 }
 
 /*

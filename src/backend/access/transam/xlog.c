@@ -70,6 +70,7 @@
 #include "common/blocksize.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"
+#include "crypto/kmgr.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
 #include "pg_trace.h"
@@ -4973,6 +4974,8 @@ BootStrapXLOG(void)
 	FIN_CRC32C(crc);
 	record->xl_crc = crc;
 
+	BootStrapKmgr();
+	InitializeBufferEncryption(bootstrap_file_encryption_method);
 	/* Create first XLOG segment file */
 	openLogTLI = BootstrapTimeLineID;
 	openLogFile = XLogFileInit(1, BootstrapTimeLineID);

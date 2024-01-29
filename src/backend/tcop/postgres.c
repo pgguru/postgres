@@ -39,6 +39,7 @@
 #include "commands/event_trigger.h"
 #include "commands/prepare.h"
 #include "common/pg_prng.h"
+#include "crypto/bufenc.h"
 #include "jit/jit.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -4134,6 +4135,17 @@ PostgresMain(const char *dbname, const char *username)
 	Assert(username != NULL);
 
 	SetProcessingMode(InitProcessing);
+
+	/*
+	 * Initialize kmgr for cluster encryption. Since kmgr needs to attach to
+	 * shared memory the initialization must be called after BaseInit().
+	 */
+	if (!IsUnderPostmaster)
+	{
+		InitializeKmgr();
+		InitializeBufferEncryption(GetFileEncryptionMethod());
+
+	}
 
 	/*
 	 * Set up signal handlers.  (InitPostmasterChild or InitStandaloneProcess

@@ -97,6 +97,8 @@
 #include "common/ip.h"
 #include "common/pg_prng.h"
 #include "common/string.h"
+#include "crypto/bufenc.h"
+#include "crypto/kmgr.h"
 #include "lib/ilist.h"
 #include "libpq/auth.h"
 #include "libpq/libpq.h"
@@ -1345,6 +1347,9 @@ PostmasterMain(int argc, char *argv[])
 		list_free_deep(elemlist);
 		pfree(rawstring);
 	}
+
+	InitializeKmgr();
+	InitializeBufferEncryption(GetFileEncryptionMethod());
 
 	/*
 	 * check that we have some socket to listen on
