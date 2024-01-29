@@ -23,9 +23,7 @@
 #ifdef FRONTEND
 #include "common/logging.h"
 #define my_error(...) pg_fatal(__VA_ARGS__)
-#define LSNForEncryption(a) InvalidXLogRecPtr
 #else
-extern XLogRecPtr LSNForEncryption(bool use_wal_lsn);
 #define my_error(...) elog(ERROR, __VA_ARGS__)
 #endif
 
