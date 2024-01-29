@@ -204,8 +204,8 @@ pg_control_recovery(PG_FUNCTION_ARGS)
 Datum
 pg_control_init(PG_FUNCTION_ARGS)
 {
-	Datum		values[12];
-	bool		nulls[12];
+	Datum		values[13];
+	bool		nulls[13];
 	TupleDesc	tupdesc;
 	HeapTuple	htup;
 	ControlFileData *ControlFile;
@@ -257,6 +257,9 @@ pg_control_init(PG_FUNCTION_ARGS)
 
 	values[11] = Int32GetDatum(ControlFile->reserved_page_size);
 	nulls[11] = false;
+
+	values[12] = Int32GetDatum(ControlFile->file_encryption_method);
+	nulls[12] = false;
 
 	htup = heap_form_tuple(tupdesc, values, nulls);
 
