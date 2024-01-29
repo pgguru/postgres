@@ -34,6 +34,7 @@ PageFeatureSet cluster_page_features;
 
 /* declarations for status GUCs */
 bool page_feature_extended_checksums;
+bool page_feature_encryption_tags;
 
 /*
  * A "page feature" is an optional cluster-defined additional data field that
@@ -75,6 +76,8 @@ bool page_feature_extended_checksums;
  * or the attempt to set the GUC will fail. */
 
 static PageFeatureDesc builtin_feature_descs[PF_MAX_FEATURE] = {
+	/* PF_ENCRYPTION_TAG */
+	{ "encryption_tags", 0 },	/* set by InitPageFeatures after we know the encryption method */
 	/* PF_EXT_CHECKSUMS */
 	{ "extended_checksums", 64 }, /* needs storage for up to 512 bits */
 };
