@@ -70,6 +70,7 @@
 #include "common/blocksize.h"
 #include "common/controldata_utils.h"
 #include "common/file_utils.h"
+#include "crypto/bufenc.h"
 #include "crypto/kmgr.h"
 #include "executor/instrument.h"
 #include "miscadmin.h"
