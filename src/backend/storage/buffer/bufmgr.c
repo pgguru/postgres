@@ -3513,7 +3513,11 @@ FlushBuffer(BufferDesc *buf, SMgrRelation reln, IOObject io_object,
 	 * buffer, other processes might be updating hint bits in it, so we must
 	 * copy the page to private storage if we do checksumming.
 	 */
-	bufToWrite = PageSetChecksumCopy((Page) bufBlock, buf->tag.blockNum);
+	bufToWrite = PageWrapForWriteCopy((Page) bufBlock, buf->tag.forkNum,
+									  buf_state & BM_PERMANENT, buf->tag.blockNum,
+									  reln->smgr_rlocator.locator.relNumber
+			);
+
 
 	io_start = pgstat_prepare_io_time(track_io_timing);
 
@@ -4172,7 +4176,10 @@ FlushRelationBuffers(Relation rel)
 				errcallback.previous = error_context_stack;
 				error_context_stack = &errcallback;
 
-				PageSetChecksumInplace(localpage, bufHdr->tag.blockNum);
+				PageWrapForWrite(localpage, bufHdr->tag.forkNum,
+								   RelationIsPermanent(rel), bufHdr->tag.blockNum,
+								   rel->rd_locator.relNumber
+					);
 
 				io_start = pgstat_prepare_io_time(track_io_timing);
 

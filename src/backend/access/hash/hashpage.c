@@ -1029,7 +1029,8 @@ _hash_alloc_buckets(Relation rel, BlockNumber firstblock, uint32 nblocks)
 					zerobuf.data,
 					true);
 
-	PageSetChecksumInplace(page, lastblock);
+	PageWrapForWrite(page, MAIN_FORKNUM, RelationIsPermanent(rel), lastblock,
+		rel->rd_locator.relNumber);
 	smgrextend(RelationGetSmgr(rel), MAIN_FORKNUM, lastblock, zerobuf.data,
 			   false);
 

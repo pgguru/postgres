@@ -514,7 +514,9 @@ RelationCopyStorage(SMgrRelation src, SMgrRelation dst,
 		if (use_wal)
 			log_newpage(&dst->smgr_rlocator.locator, forkNum, blkno, page, false);
 
-		PageSetChecksumInplace(page, blkno);
+		PageWrapForWrite(page, forkNum,
+						   relpersistence == RELPERSISTENCE_PERMANENT, blkno,
+						   dst->smgr_rlocator.locator.relNumber);
 
 		/*
 		 * Now write the page.  We say skipFsync = true because there's no

@@ -244,7 +244,9 @@ GetLocalVictimBuffer(void)
 		/* Find smgr relation for buffer */
 		oreln = smgropen(BufTagGetRelFileLocator(&bufHdr->tag), MyBackendId);
 
-		PageSetChecksumInplace(localpage, bufHdr->tag.blockNum);
+		PageWrapForWrite(localpage, bufHdr->tag.forkNum,
+					   buf_state & BM_PERMANENT, bufHdr->tag.blockNum,
+					   bufHdr->tag.relNumber);
 
 		io_start = pgstat_prepare_io_time(track_io_timing);
 

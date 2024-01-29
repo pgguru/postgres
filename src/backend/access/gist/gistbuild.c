@@ -459,7 +459,8 @@ gist_indexsortbuild(GISTBuildState *state)
 
 	/* Write out the root */
 	PageSetLSN(levelstate->pages[0], GistBuildLSN);
-	PageSetChecksumInplace(levelstate->pages[0], GIST_ROOT_BLKNO);
+	PageWrapForWrite(levelstate->pages[0], MAIN_FORKNUM, RelationIsPermanent(state->indexrel),
+					   GIST_ROOT_BLKNO, state->indexrel->rd_locator.relNumber);
 	smgrwrite(RelationGetSmgr(state->indexrel), MAIN_FORKNUM, GIST_ROOT_BLKNO,
 			  levelstate->pages[0], true);
 	if (RelationNeedsWAL(state->indexrel))
@@ -657,7 +658,9 @@ gist_indexsortbuild_flush_ready_pages(GISTBuildState *state)
 			elog(ERROR, "unexpected block number to flush GiST sorting build");
 
 		PageSetLSN(page, GistBuildLSN);
-		PageSetChecksumInplace(page, blkno);
+		PageWrapForWrite(page, MAIN_FORKNUM, RelationIsPermanent(state->indexrel),
+						   blkno, state->indexrel->rd_locator.relNumber
+			);
 		smgrextend(RelationGetSmgr(state->indexrel), MAIN_FORKNUM, blkno, page,
 				   true);
 
