@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "crypto/bufenc.h"
 #include "common/file_utils.h"
 #include "miscadmin.h"
 #include "pgstat.h"
@@ -71,7 +72,7 @@ copydir(const char *fromdir, const char *todir, bool recurse)
 				copydir(fromfile, tofile, true);
 		}
 		else if (xlde_type == PGFILETYPE_REG)
-			copy_file(fromfile, tofile);
+			copy_file(fromfile, tofile, false);
 	}
 	FreeDir(xldir);
 
@@ -114,7 +115,7 @@ copydir(const char *fromdir, const char *todir, bool recurse)
  * copy one file
  */
 void
-copy_file(const char *fromfile, const char *tofile)
+copy_file(const char *fromfile, const char *tofile, bool encrypt_init_file)
 {
 	char	   *buffer;
 	int			srcfd;
@@ -122,6 +123,7 @@ copy_file(const char *fromfile, const char *tofile)
 	int			nbytes;
 	off_t		offset;
 	off_t		flush_offset;
+	RelFileNumber fileno = 0;
 
 	/* Size of copy buffer (read and write requests) */
 #define COPY_BUF_SIZE (8 * BLCKSZ)
@@ -185,6 +187,37 @@ copy_file(const char *fromfile, const char *tofile)
 					 errmsg("could not read file \"%s\": %m", fromfile)));
 		if (nbytes == 0)
 			break;
+		/*
+		 * When we copy an init fork page to be part of an empty unlogged
+		 * relation, the page must be reencrypted with new IVs.
+		 */
+		if (encrypt_init_file)
+		{
+			Page page = (Page) buffer;
+
+			/* fileno */
+			if (!fileno)
+			{
+				/*
+				 * Parse fileno from tofile; if we have hit this routine we
+				 * already know we are an init fork and using a valid
+				 * relfilenumber, so we can just backtrack to the previous
+				 * path separator and just atoi() to get our result.
+				 */
+
+				char *ptr = strrchr(tofile, '/');
+				if (ptr)
+					fileno = atoi(ptr+1);
+				else
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("could not determine relfilenumber for init fork")));
+			}
+
+			Assert(nbytes == BLCKSZ);
+			PageWrapForWrite(page, MAIN_FORKNUM, false, offset / BLCKSZ, fileno);
+		}
+
 		errno = 0;
 		pgstat_report_wait_start(WAIT_EVENT_COPY_FILE_WRITE);
 		if ((int) write(dstfd, buffer, nbytes) != nbytes)
