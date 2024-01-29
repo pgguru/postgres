@@ -12,6 +12,7 @@
 
 #include "common/relpath.h"
 #include "libpq-fe.h"
+#include "common/kmgr_utils.h"
 
 /* For now, pg_upgrade does not use common/logging.c; use our own pg_fatal */
 #undef pg_fatal
@@ -328,6 +329,8 @@ typedef struct
 	int			jobs;			/* number of processes/threads to use */
 	char	   *socketdir;		/* directory to use for Unix sockets */
 	char	   *sync_method;
+	bool		ind_coll_unknown;	/* mark unknown index collation versions */
+	bool		pass_terminal_fd; /* pass -R to pg_ctl? */
 } UserOpts;
 
 typedef struct
