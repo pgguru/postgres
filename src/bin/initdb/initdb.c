@@ -2502,6 +2502,8 @@ usage(const char *progname)
 	printf(_("      --auth-host=METHOD    default authentication method for local TCP/IP connections\n"));
 	printf(_("      --auth-local=METHOD   default authentication method for local-socket connections\n"));
 	printf(_("  -b, --reserved-size=SIZE  reserved space in disk pages for page features\n"));
+	printf(_("  -F, --page-feature NAME=VALUE\n"
+			 "                            reserve VALUE bytes for page feature NAME\n"));
 	printf(_(" [-D, --pgdata=]DATADIR     location for this database cluster\n"));
 	printf(_("  -E, --encoding=ENCODING   set default encoding for new databases\n"));
 	printf(_("  -g, --allow-group-access  allow group read/execute on data directory\n"));
@@ -3174,6 +3176,7 @@ main(int argc, char *argv[])
 		{"wal-segsize", required_argument, NULL, 12},
 		{"reserved-size", required_argument, NULL, 'b'},
 		{"data-checksums", no_argument, NULL, 'k'},
+		{"page-feature", required_argument, NULL, 'F'},
 		{"allow-group-access", no_argument, NULL, 'g'},
 		{"discard-caches", no_argument, NULL, 14},
 		{"locale-provider", required_argument, NULL, 15},
@@ -3223,7 +3226,7 @@ main(int argc, char *argv[])
 
 	/* process command-line options */
 
-	while ((c = getopt_long(argc, argv, "A:b:c:dD:E:gkL:nNsST:U:WX:",
+	while ((c = getopt_long(argc, argv, "A:b:c:dD:E:F:gkL:nNsST:U:WX:",
 							long_options, &option_index)) != -1)
 	{
 		switch (c)
@@ -3273,6 +3276,35 @@ main(int argc, char *argv[])
 				break;
 			case 'E':
 				encoding = pg_strdup(optarg);
+				break;
+			case 'F':
+				{
+					char		errbuf[100] = {'-','F',' '};
+					char	   *equals, *feat;
+					int			value;
+
+					/* we are using this buffer for both parsing our name as
+					 * well as displaying a relevant message in event of
+					 * error */
+					feat = errbuf + 3;
+					strncpy(feat, optarg, 96);
+
+					equals = strchr(feat, '=');
+
+					if (!equals || feat == equals)
+						pg_fatal("Page feature format is name=NN");
+
+					*equals++ = '\0';
+
+					if (!option_parse_int(equals, errbuf, 1, MaxReservedPageSize, &value))
+						pg_fatal("couldn't parse page feature size");
+
+					if (PageFeatureSetHasNamedFeature(cluster_page_features, feat))
+						pg_fatal("duplicate page feature specified");
+
+					if (!PageFeatureSetAddFeatureByName(cluster_page_features, feat, value))
+						pg_fatal("couldn't add feature \"%s\" of size \"%d\" bytes", feat, value);
+				}
 				break;
 			case 'W':
 				pwprompt = true;
