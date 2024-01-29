@@ -5055,6 +5055,12 @@ BootStrapXLOG(void)
 	/* some additional ControlFile fields are set in WriteControlFile() */
 	WriteControlFile();
 
+	if (terminal_fd != -1)
+	{
+		close(terminal_fd);
+		terminal_fd = -1;
+	}
+
 	/* Bootstrap the commit log, too */
 	BootStrapCLOG();
 	BootStrapCommitTs();
