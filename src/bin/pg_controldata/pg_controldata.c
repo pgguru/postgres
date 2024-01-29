@@ -335,5 +335,7 @@ main(int argc, char *argv[])
 		   PageFeatureSetCalculateSize(cluster_page_features));
 	printf(_("Extended checksum method:             %s\n"),
 		   pg_checksum_type_name(ControlFile->data_checksum_version));
+	printf(_("File encryption method:               %s\n"),
+		   encryption_methods[ControlFile->file_encryption_method].name);
 	return 0;
 }

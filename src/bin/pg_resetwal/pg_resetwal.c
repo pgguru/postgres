@@ -827,6 +827,8 @@ PrintControlValues(bool guessed)
 		   (ControlFile.float8ByVal ? _("by value") : _("by reference")));
 	printf(_("Data page checksum version:           %u\n"),
 		   ControlFile.data_checksum_version);
+	printf(_("File encryption method:               %s\n"),
+		   encryption_methods[ControlFile.file_encryption_method].name);
 }
 
 
