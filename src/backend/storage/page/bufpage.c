@@ -102,7 +102,8 @@ PageInit(Page page, Size pageSize, Size specialSize)
  * to pgstat.
  */
 bool
-PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
+PageIsVerifiedExtended(Page page, ForkNumber forknum, bool relation_is_permanent,
+					   BlockNumber blkno, RelFileNumber fileno, int flags)
 {
 	PageHeader	p = (PageHeader) page;
 	size_t	   *pagebytes;
@@ -115,7 +116,7 @@ PageIsVerifiedExtended(Page page, BlockNumber blkno, int flags)
 	 */
 	if (!PageIsNew(page))
 	{
-		checksum_failure = !PageIsChecksumValid(page, blkno);
+		checksum_failure = !PageUnwrapFromRead(page, forknum, relation_is_permanent, blkno, fileno);
 
 		/*
 		 * The following checks don't prove the header is correct, only that
