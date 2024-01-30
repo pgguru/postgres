@@ -4444,7 +4444,29 @@ DataChecksumsType(void)
 uint64
 IncrementIVCounter()
 {
-	return pg_atomic_fetch_add_u64(&ControlFile->iv_counter, 1);
+	uint64 val = pg_atomic_fetch_add_u64(&ControlFile->iv_counter, 1);
+	START_CRIT_SECTION();
+	XLogBeginInsert();
+	XLogRegisterData((char*)&val,sizeof(uint64));
+	XLogInsert(RM_IVCNT_ID, XL_IVCOUNTER_LOG);
+	END_CRIT_SECTION();
+	return val;
+}
+
+void
+ivcounter_redo(XLogReaderState *record)
+{
+	uint8		info = XLogRecGetInfo(record) & ~XLR_INFO_MASK;
+	uint64	   *val;
+
+	if (info != XL_IVCOUNTER_LOG)
+		elog(PANIC, "ivcounter_redo: unknown op code %u", info);
+
+	val = (uint64*)XLogRecGetData(record);
+	if (!val)
+		elog(PANIC, "ivcounter_redo: couldn't get data");
+
+	pg_atomic_write_u64(&ControlFile->iv_counter, *val);
 }
 
 /*

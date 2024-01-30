@@ -197,6 +197,8 @@ typedef enum WALAvailability
 	WALAVAIL_REMOVED,			/* WAL segment has been removed */
 } WALAvailability;
 
+#define XL_IVCOUNTER_LOG 0
+
 struct XLogRecData;
 struct XLogReaderState;
 
@@ -237,6 +239,9 @@ extern pg_checksum_type DataChecksumsType(void);
 #define FileEncryptionEnabled (GetFileEncryptionMethod() != DISABLED_ENCRYPTION_METHOD)
 extern int GetFileEncryptionMethod(void);
 extern uint64 IncrementIVCounter(void);
+extern void ivcounter_redo(struct XLogReaderState *record);
+extern void ivcounter_desc(StringInfo buf, struct XLogReaderState *record);
+extern const char *ivcounter_identify(uint8 info);
 
 extern XLogRecPtr GetFakeLSNForUnloggedRel(void);
 extern Size XLOGShmemSize(void);
