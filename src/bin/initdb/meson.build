@@ -35,6 +35,7 @@ tests += {
     'tests': [
       't/001_initdb.pl',
       't/002_reservedsize.pl',
+      't/003_pagefeats.pl',
     ],
   },
 }
