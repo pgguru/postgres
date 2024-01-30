@@ -3602,9 +3602,12 @@ main(int argc, char *argv[])
 		file_encryption_method = DEFAULT_ENABLED_ENCRYPTION_METHOD;
 
 	/* update page features requirement if encryption method uses authtag */
-	if (encryption_methods[file_encryption_method].authtag_len > 0)
+	if (file_encryption_method != DISABLED_ENCRYPTION_METHOD)
+	{
 		PageFeatureSetAddFeature(cluster_page_features, PF_ENCRYPTION_TAG, \
-								 encryption_methods[file_encryption_method].authtag_len);
+								 EncryptionIVLength(file_encryption_method) + \
+								 SizeOfEncryptionTag(file_encryption_method) );
+	}
 
 	check_authmethod_unspecified(&authmethodlocal);
 	check_authmethod_unspecified(&authmethodhost);

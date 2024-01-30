@@ -306,19 +306,11 @@ BootstrapModeMain(int argc, char *argv[], bool check_only)
  					for (i = DISABLED_ENCRYPTION_METHOD + 1;
  						 i < NUM_ENCRYPTION_METHODS; i++)
  						if (pg_strcasecmp(optarg, encryption_methods[i].name) == 0)
- 						{
  							bootstrap_file_encryption_method = i;
-							if (SizeOfEncryptionTag(bootstrap_file_encryption_method) > 0)
-								PageFeatureSetAddFeatureByName(
-								   cluster_page_features,
-								   "encryption_tags",
-								   SizeOfEncryptionTag(bootstrap_file_encryption_method));
- 							break;
- 						}
- 					if (i == NUM_ENCRYPTION_METHODS)
+ 					if (i > NUM_ENCRYPTION_METHODS)
  						ereport(ERROR,
  								(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
- 								 errmsg("invalid encryption method specified")));
+ 								 errmsg("invalid encryption method specified: %s", optarg)));
  				}
  				break;
 			case 'r':

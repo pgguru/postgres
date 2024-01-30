@@ -32,6 +32,7 @@
 #define SizeOfEncryptionTag(m) encryption_methods[m].authtag_len
 #define EncryptionAlgorithm(m) encryption_methods[m].algorithm
 #define EncryptionKeyLength(m) encryption_methods[m].key_length
+#define EncryptionIVLength(m) 16
 #define EncryptionBlockLength(m) (encryption_methods[m].block_length/8)
 
 /* AES128/192/256 various length definitions */
