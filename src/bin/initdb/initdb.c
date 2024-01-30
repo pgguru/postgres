@@ -422,6 +422,15 @@ add_init_option_int(const char *opt, int val)
 }
 
 /*
+ * Add an option to our initlist
+ */
+static void
+add_init_option_str(const char *opt, char *val)
+{
+	add_stringlist_item(&init_options, psprintf("%s %s", opt, val));
+}
+
+/*
  * Add a pagefeat to our initlist
  */
 static void
@@ -3356,6 +3365,8 @@ main(int argc, char *argv[])
 						/* counts for both explicit NONE or invalid case */
 						if (!PageFeatureSetAddFeature(cluster_page_features, PF_EXT_CHECKSUMS, hash_size))
 							pg_fatal("error adding checksum feature");
+
+						add_init_option_str("--extended-checksums", optarg);
 					}
 				}
 				break;
