@@ -15,9 +15,8 @@
 #include "crypto/kmgr.h"
 #include "access/xlog_internal.h"
 
-/* Cluster encryption encrypts only main forks */
 #define PageNeedsToBeEncrypted(forknum) \
-	(FileEncryptionEnabled && (forknum) == MAIN_FORKNUM)
+	(FileEncryptionEnabled)
 
 
 #ifdef FRONTEND
