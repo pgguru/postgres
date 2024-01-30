@@ -418,6 +418,15 @@ add_init_option_int(const char *opt, int val)
 	add_stringlist_item(&init_options, buf);
 }
 
+/*
+ * Add a pagefeat to our initlist
+ */
+static void
+add_init_option_pagefeat(const char *opt, int val)
+{
+	add_stringlist_item(&init_options, psprintf("--page-feature %s=%d", opt, val));
+}
+
 /* output our initlist */
 static void
 output_init_list(void)
@@ -3304,6 +3313,9 @@ main(int argc, char *argv[])
 
 					if (!PageFeatureSetAddFeatureByName(cluster_page_features, feat, value))
 						pg_fatal("couldn't add feature \"%s\" of size \"%d\" bytes", feat, value);
+
+					add_init_option_pagefeat(feat, value);
+
 				}
 				break;
 			case 'W':
