@@ -157,6 +157,7 @@ static const char *authmethodhost = NULL;
 static const char *authmethodlocal = NULL;
 static _stringlist *extra_guc_names = NULL;
 static _stringlist *extra_guc_values = NULL;
+static _stringlist *init_options = NULL;
 static bool debug = false;
 static bool noclean = false;
 static bool noinstructions = false;
@@ -400,6 +401,43 @@ add_stringlist_item(_stringlist **listhead, const char *str)
 			 /* skip */ ;
 		oldentry->next = newentry;
 	}
+}
+
+/*
+ * Add an option to our initlist
+ */
+static void
+add_init_option_int(const char *opt, int val)
+{
+	char buf[100];
+
+	snprintf(buf, sizeof(buf)-1, "%s %d", opt, val);
+	add_stringlist_item(&init_options, buf);
+}
+
+/* output our initlist */
+static void
+output_init_list(void)
+{
+	char *path = psprintf("%s/%s", pg_data, "init_opts");
+	int cnt = 0;
+	struct _stringlist *s;
+	FILE *f;
+
+	if (!init_options)
+		return;
+
+	if ((f = fopen(path, "w")) == NULL)
+		pg_fatal("could not open file \"%s\" for writing: %m", path);
+
+	for (s = init_options; s; s=s->next)
+	{
+		if (cnt++)
+			fputc(' ', f);
+		fputs(s->str, f);
+	}
+	fputc('\n', f);
+	fclose(f);
 }
 
 /*
@@ -3021,6 +3059,8 @@ initialize_data_directory(void)
 	 */
 	write_version_file("base/1");
 
+	output_init_list();
+
 	/*
 	 * Create the stuff we don't need to use bootstrap mode for, using a
 	 * backend running in simple standalone mode.
@@ -3384,6 +3424,7 @@ main(int argc, char *argv[])
 		/* check for valid block_size; last is bitwise power of two check */
 		if (!IsValidReservedPageSize(reserved_page_size))
 			pg_fatal("argument of --reserved-size must be a multiple of 8 between 0 and 256");
+		add_init_option_int("--reserved-size", reserved_page_size);
 	}
 
 	BlockSizeInit(BLCKSZ, reserved_page_size);
