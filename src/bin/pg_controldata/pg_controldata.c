@@ -337,5 +337,7 @@ main(int argc, char *argv[])
 		   pg_checksum_type_name(ControlFile->data_checksum_version));
 	printf(_("File encryption method:               %s\n"),
 		   encryption_methods[ControlFile->file_encryption_method].name);
+	printf(_("IV counter:                           " UINT64_FORMAT "\n"),
+		   ControlFile->iv_counter);
 	return 0;
 }
