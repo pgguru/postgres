@@ -101,7 +101,9 @@ static int file_encryption_method = DISABLED_ENCRYPTION_METHOD;
 
 /* this private struct is used to store additional info about the page used to validate specific other pages */
 typedef struct AdditionalAuthenticatedData {
+#if PageEncryptOffset > 0
 	unsigned char data[PageEncryptOffset]; /* copy of the unencrypted page header info */
+#endif
 	RelFileNumber fileno;
 	BlockNumber blkNo;
 } AdditionalAuthenticatedData;
@@ -255,7 +257,9 @@ setup_additional_authenticated_data(Page page, BlockNumber blkno,
 									bool relation_is_permanent, RelFileNumber fileno)
 {
 	/* snarf the existing unencrypted bits of the page header */
+#if PageEncryptOffset > 0
 	memcpy(&auth_data.data, page, PageEncryptOffset);
+#endif
 	auth_data.fileno = fileno;
 	auth_data.blkNo = blkno;
 }

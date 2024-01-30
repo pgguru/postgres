@@ -186,7 +186,9 @@ typedef struct PageHeaderData
 } PageHeaderData;
 
 typedef PageHeaderData *PageHeader;
-#define PageEncryptOffset	offsetof(PageHeaderData, pd_special)
+/* start page encryption from this point until the start of the encryption block */
+/*#define PageEncryptOffset	offsetof(PageHeaderData, pd_special)*/
+#define PageEncryptOffset 0
 
 /*
  * pd_flags contains the following flag bits.  Undefined bits are initialized
