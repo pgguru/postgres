@@ -564,19 +564,33 @@ StaticAssertDecl(MaxOffsetNumber < SpecTokenOffsetNumber,
 #define MinHeapTupleSize  MAXALIGN(SizeofHeapTupleHeader)
 
 /*
- * MaxHeapTuplesPerPage is an upper bound on the number of tuples that can
- * fit on one heap page.  (Note that indexes could have more, because they
- * use a smaller tuple header.)  We arrive at the divisor because each tuple
- * must be maxaligned, and it must have an associated line pointer.
+ * ClusterMaxHeapTuplesPerPage is a cluster-specific upper bound on the number
+ * of tuples that can fit on one heap page.  (Note that indexes could have
+ * more, because they use a smaller tuple header.)  We arrive at the divisor
+ * because each tuple must be maxaligned, and it must have an associated line
+ * pointer.
+ *
+ * MaxHeapTuplesPerPageLimit is the largest value that
+ * ClusterMaxHeapTuplesPerPage could be.  While these currently evaluate to
+ * the same value, these are being split out so ClusterMaxHeapTuplesPerPage
+ * can become a variable instead of a constant.
+ *
+ * The CalcMaxHeapTuplesPerPage() macro is used to determine the appropriate
+ * values, given the usable page space on a given page.
+ *
+ * The old MaxHeapTuplesPerPage symbol has been removed; static allocations
+ * should use the MaxHeapTuplesPerPageLimit constant, while runtime code
+ * should use ClusterMaxHeapTuplesPerPage.
  *
  * Note: with HOT, there could theoretically be more line pointers (not actual
  * tuples) than this on a heap page.  However we constrain the number of line
  * pointers to this anyway, to avoid excessive line-pointer bloat and not
  * require increases in the size of work arrays.
  */
-#define MaxHeapTuplesPerPage	\
-	((int) ((BLCKSZ - SizeOfPageHeaderData) / \
+#define CalcMaxHeapTuplesPerPage(size)	((int) ((size) / \
 			(MAXALIGN(SizeofHeapTupleHeader) + sizeof(ItemIdData))))
+#define ClusterMaxHeapTuplesPerPage CalcMaxHeapTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
+#define MaxHeapTuplesPerPageLimit CalcMaxHeapTuplesPerPage(BLCKSZ - SizeOfPageHeaderData)
 
 /*
  * MaxAttrSize is a somewhat arbitrary upper limit on the declared size of

@@ -478,7 +478,7 @@ heapgetpage(TableScanDesc sscan, BlockNumber block)
 
 	LockBuffer(buffer, BUFFER_LOCK_UNLOCK);
 
-	Assert(ntup <= MaxHeapTuplesPerPage);
+	Assert(ntup <= ClusterMaxHeapTuplesPerPage);
 	scan->rs_ntuples = ntup;
 }
 
@@ -6750,8 +6750,8 @@ heap_freeze_execute_prepared(Relation rel, Buffer buffer,
 	/* Now WAL-log freezing if necessary */
 	if (RelationNeedsWAL(rel))
 	{
-		xl_heap_freeze_plan plans[MaxHeapTuplesPerPage];
-		OffsetNumber offsets[MaxHeapTuplesPerPage];
+		xl_heap_freeze_plan plans[MaxHeapTuplesPerPageLimit];
+		OffsetNumber offsets[MaxHeapTuplesPerPageLimit];
 		int			nplans;
 		xl_heap_freeze_page xlrec;
 		XLogRecPtr	recptr;

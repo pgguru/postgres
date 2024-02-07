@@ -547,7 +547,7 @@ RelationGetBufferForTuple(Relation relation, Size len,
 	 * extensions while inserting large tuples into low-fillfactor tables.
 	 */
 	nearlyEmptyFreeSpace = MaxHeapTupleSize -
-		(MaxHeapTuplesPerPage / 8 * sizeof(ItemIdData));
+		(ClusterMaxHeapTuplesPerPage / 8 * sizeof(ItemIdData));
 	if (len + saveFreeSpace > nearlyEmptyFreeSpace)
 		targetFreeSpace = Max(len, nearlyEmptyFreeSpace);
 	else
