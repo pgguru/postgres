@@ -9231,7 +9231,7 @@ heap_xlog_insert(XLogReaderState *record)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	HeapTupleHeader htup;
 	xl_heap_header xlhdr;
@@ -9287,7 +9287,7 @@ heap_xlog_insert(XLogReaderState *record)
 		data = XLogRecGetBlockData(record, 0, &datalen);
 
 		newlen = datalen - SizeOfHeapHeader;
-		Assert(datalen > SizeOfHeapHeader && newlen <= MaxHeapTupleSize);
+		Assert(datalen > SizeOfHeapHeader && newlen <= ClusterMaxHeapTupleSize);
 		memcpy((char *) &xlhdr, data, SizeOfHeapHeader);
 		data += SizeOfHeapHeader;
 
@@ -9353,7 +9353,7 @@ heap_xlog_multi_insert(XLogReaderState *record)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	HeapTupleHeader htup;
 	uint32		newlen;
@@ -9431,7 +9431,7 @@ heap_xlog_multi_insert(XLogReaderState *record)
 			tupdata = ((char *) xlhdr) + SizeOfMultiInsertTuple;
 
 			newlen = xlhdr->datalen;
-			Assert(newlen <= MaxHeapTupleSize);
+			Assert(newlen <= ClusterMaxHeapTupleSize);
 			htup = &tbuf.hdr;
 			MemSet((char *) htup, 0, SizeofHeapTupleHeader);
 			/* PG73FORMAT: get bitmap [+ padding] [+ oid] + data */
@@ -9510,7 +9510,7 @@ heap_xlog_update(XLogReaderState *record, bool hot_update)
 	union
 	{
 		HeapTupleHeaderData hdr;
-		char		data[MaxHeapTupleSize];
+		char		data[MaxHeapTupleSizeLimit];
 	}			tbuf;
 	xl_heap_header xlhdr;
 	uint32		newlen;
@@ -9666,7 +9666,7 @@ heap_xlog_update(XLogReaderState *record, bool hot_update)
 		recdata += SizeOfHeapHeader;
 
 		tuplen = recdata_end - recdata;
-		Assert(tuplen <= MaxHeapTupleSize);
+		Assert(tuplen <= ClusterMaxHeapTupleSize);
 
 		htup = &tbuf.hdr;
 		MemSet((char *) htup, 0, SizeofHeapTupleHeader);
