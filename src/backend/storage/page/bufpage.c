@@ -1165,8 +1165,8 @@ PageIndexMultiDelete(Page page, OffsetNumber *itemnos, int nitems)
 	Offset		pd_upper = phdr->pd_upper;
 	Offset		pd_special = phdr->pd_special;
 	Offset		last_offset;
-	itemIdCompactData itemidbase[MaxIndexTuplesPerPage];
-	ItemIdData	newitemids[MaxIndexTuplesPerPage];
+	itemIdCompactData itemidbase[MaxIndexTuplesPerPageLimit];
+	ItemIdData	newitemids[MaxIndexTuplesPerPageLimit];
 	itemIdCompact itemidptr;
 	ItemId		lp;
 	int			nline,
@@ -1178,7 +1178,7 @@ PageIndexMultiDelete(Page page, OffsetNumber *itemnos, int nitems)
 	OffsetNumber offnum;
 	bool		presorted = true;	/* For now */
 
-	Assert(nitems <= MaxIndexTuplesPerPage);
+	Assert(nitems <= ClusterMaxIndexTuplesPerPage);
 
 	/*
 	 * If there aren't very many items to delete, then retail

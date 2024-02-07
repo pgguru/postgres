@@ -887,7 +887,7 @@ typedef struct BTDedupStateData
 	 * are implicitly unchanged by deduplication pass).
 	 */
 	int			nintervals;		/* current number of intervals in array */
-	BTDedupInterval intervals[MaxIndexTuplesPerPage];
+	BTDedupInterval intervals[MaxIndexTuplesPerPageLimit];
 } BTDedupStateData;
 
 typedef BTDedupStateData *BTDedupState;
