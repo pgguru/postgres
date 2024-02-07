@@ -263,8 +263,8 @@ btgettuple(IndexScanDesc scan, ScanDirection dir)
 				 */
 				if (so->killedItems == NULL)
 					so->killedItems = (int *)
-						palloc(MaxTIDsPerBTreePage * sizeof(int));
-				if (so->numKilled < MaxTIDsPerBTreePage)
+						palloc(ClusterMaxTIDsPerBTreePage * sizeof(int));
+				if (so->numKilled < ClusterMaxTIDsPerBTreePage)
 					so->killedItems[so->numKilled++] = so->currPos.itemIndex;
 			}
 
