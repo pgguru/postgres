@@ -4251,6 +4251,7 @@ ReadControlFile(void)
 	pg_crc32c	crc;
 	int			fd;
 	static char wal_segsz_str[20];
+	static char reserved_page_size_str[20];
 	int			r;
 	int reserved_page_size;
 	/*
@@ -4334,6 +4335,9 @@ ReadControlFile(void)
 									  reserved_page_size)));
 
 	BlockSizeInit(ControlFile->blcksz, reserved_page_size);
+	snprintf(reserved_page_size_str, sizeof(reserved_page_size_str), "%d", reserved_page_size);
+	SetConfigOption("reserved_page_size", reserved_page_size_str, PGC_INTERNAL,
+					PGC_S_DYNAMIC_DEFAULT);
 
 	/*
 	 * Do compatibility checking immediately.  If the database isn't
