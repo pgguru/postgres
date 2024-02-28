@@ -4181,6 +4181,7 @@ WriteControlFile(void)
 	ControlFile->relseg_size = RELSEG_SIZE;
 	ControlFile->xlog_blcksz = XLOG_BLCKSZ;
 	ControlFile->xlog_seg_size = wal_segment_size;
+	ControlFile->reserved_page_size = ReservedPageSize;
 
 	ControlFile->nameDataLen = NAMEDATALEN;
 	ControlFile->indexMaxKeys = INDEX_MAX_KEYS;
@@ -4250,8 +4251,9 @@ ReadControlFile(void)
 	pg_crc32c	crc;
 	int			fd;
 	static char wal_segsz_str[20];
+	static char reserved_page_size_str[20];
 	int			r;
-
+	int reserved_page_size;
 	/*
 	 * Read data...
 	 */
@@ -4317,6 +4319,7 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("incorrect checksum in control file")));
 
+	reserved_page_size = ControlFile->reserved_page_size;
 	/*
 	 * Do compatibility checking immediately.  If the database isn't
 	 * compatible with the backend executable, we want to abort before we can
