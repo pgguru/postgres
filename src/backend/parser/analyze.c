@@ -1371,6 +1371,20 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 	qry->targetList = transformTargetList(pstate, stmt->targetList,
 										  EXPR_KIND_SELECT_TARGET);
 
+	/* if groupByAll, expand targetList into groupClause. In this case, we cannot have any other group clauses, so this is safe */
+
+	if (stmt->groupAll)
+	{
+		ListCell *l1;
+		/* iterate over targets, any non-aggregate gets added as a Target */
+		foreach (l1,qry->targetList)
+		{
+			TargetEntry *n = (TargetEntry*)lfirst(l1);
+			if (!IsA(n->expr,Aggref))
+				qry->groupClause = addTargetToGroupList(pstate, n, qry->groupClause, qry->targetList, 0);
+		}
+	}
+
 	/* mark column origins */
 	markTargetListOrigins(pstate, qry->targetList);
 
@@ -1394,14 +1408,16 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 										  EXPR_KIND_ORDER_BY,
 										  false /* allow SQL92 rules */ );
 
-	qry->groupClause = transformGroupClause(pstate,
-											stmt->groupClause,
-											&qry->groupingSets,
-											&qry->targetList,
-											qry->sortClause,
-											EXPR_KIND_GROUP_BY,
-											false /* allow SQL92 rules */ );
+	if (!stmt->groupAll)
+		qry->groupClause = transformGroupClause(pstate,
+												stmt->groupClause,
+												&qry->groupingSets,
+												&qry->targetList,
+												qry->sortClause,
+												EXPR_KIND_GROUP_BY,
+												false /* allow SQL92 rules */ );
 	qry->groupDistinct = stmt->groupDistinct;
+	qry->groupAll = stmt->groupAll;
 
 	if (stmt->distinctClause == NIL)
 	{

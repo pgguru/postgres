@@ -512,6 +512,38 @@ drop table t2;
 drop table t3;
 drop table p_t1;
 
+
+--
+-- Test GROUP BY ALL
+--
+
+CREATE TEMP TABLE t1 (
+  a int,
+  b int
+);
+
+COPY t1 FROM STDIN;
+1	1
+1	2
+1	3
+\N	2
+1	3
+\.
+
+-- basic field check
+SELECT b, COUNT(*) FROM t1 GROUP BY ALL;
+
+-- throw a null in the values too
+SELECT a, COUNT(a) FROM t1 GROUP BY ALL;
+
+-- multiple columns, non-consecutive order
+SELECT a, SUM(b), b FROM t1 GROUP BY ALL;
+
+-- multi columns, no aggregate
+SELECT a + b FROM t1 GROUP BY ALL;
+
+DROP TABLE t1;
+
 --
 -- Test GROUP BY matching of join columns that are type-coerced due to USING
 --

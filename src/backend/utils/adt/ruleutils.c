@@ -5965,38 +5965,43 @@ get_basic_select_query(Query *query, deparse_context *context,
 
 		appendContextKeyword(context, " GROUP BY ",
 							 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
-		if (query->groupDistinct)
-			appendStringInfoString(buf, "DISTINCT ");
-
-		save_exprkind = context->special_exprkind;
-		context->special_exprkind = EXPR_KIND_GROUP_BY;
-
-		if (query->groupingSets == NIL)
-		{
-			sep = "";
-			foreach(l, query->groupClause)
-			{
-				SortGroupClause *grp = (SortGroupClause *) lfirst(l);
-
-				appendStringInfoString(buf, sep);
-				get_rule_sortgroupclause(grp->tleSortGroupRef, query->targetList,
-										 false, context);
-				sep = ", ";
-			}
-		}
+		if (query->groupAll)
+			appendContextKeyword(context, " ALL ",
+								 -PRETTYINDENT_STD, PRETTYINDENT_STD, 1);
 		else
 		{
-			sep = "";
-			foreach(l, query->groupingSets)
-			{
-				GroupingSet *grp = lfirst(l);
+			if (query->groupDistinct)
+				appendStringInfoString(buf, "DISTINCT ");
 
-				appendStringInfoString(buf, sep);
-				get_rule_groupingset(grp, query->targetList, true, context);
-				sep = ", ";
+			save_exprkind = context->special_exprkind;
+			context->special_exprkind = EXPR_KIND_GROUP_BY;
+
+			if (query->groupingSets == NIL)
+			{
+				sep = "";
+				foreach(l, query->groupClause)
+				{
+					SortGroupClause *grp = (SortGroupClause *) lfirst(l);
+
+					appendStringInfoString(buf, sep);
+					get_rule_sortgroupclause(grp->tleSortGroupRef, query->targetList,
+											 false, context);
+					sep = ", ";
+				}
+			}
+			else
+			{
+				sep = "";
+				foreach(l, query->groupingSets)
+				{
+					GroupingSet *grp = lfirst(l);
+
+					appendStringInfoString(buf, sep);
+					get_rule_groupingset(grp, query->targetList, true, context);
+					sep = ", ";
+				}
 			}
 		}
-
 		context->special_exprkind = save_exprkind;
 	}
 
