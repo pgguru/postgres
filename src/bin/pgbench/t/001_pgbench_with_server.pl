@@ -80,6 +80,16 @@ $node->pgbench(
 	'no such database');
 
 $node->pgbench(
+	'-d no-such-database',
+	1,
+	[qr{^$}],
+	[
+		qr{connection to server .* failed},
+		qr{FATAL:  database "no-such-database" does not exist}
+	],
+	'no such database (-d)');
+
+$node->pgbench(
 	'-S -t 1', 1, [],
 	[qr{Perhaps you need to do initialization}],
 	'run without init');
@@ -1352,7 +1362,7 @@ my $err_pattern =
   . "\\1";
 
 $node->pgbench(
-	"-n -c 2 -t 1 -d --verbose-errors --max-tries 2",
+	"-n -c 2 -t 1 --debug --verbose-errors --max-tries 2",
 	0,
 	[
 		qr{processed: 2/2\b},
