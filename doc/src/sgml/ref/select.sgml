@@ -796,7 +796,7 @@ WHERE <replaceable class="parameter">condition</replaceable>
    <para>
     The optional <literal>GROUP BY</literal> clause has the general form
 <synopsis>
-GROUP BY [ ALL | DISTINCT ] <replaceable class="parameter">grouping_element</replaceable> [, ...]
+GROUP BY { ALL | [ ALL | DISTINCT ] <replaceable class="parameter">grouping_element</replaceable> [, ...] }
 </synopsis>
    </para>
 
@@ -811,6 +811,14 @@ GROUP BY [ ALL | DISTINCT ] <replaceable class="parameter">grouping_element</rep
     expression formed from input-column values.  In case of ambiguity,
     a <literal>GROUP BY</literal> name will be interpreted as an
     input-column name rather than an output column name.
+   </para>
+
+   <para>
+    The form <literal>GROUP BY ALL</literal> with no additional
+    <replaceable class="parameter">grouping_element</replaceable> elements
+    provided is equivalent to doing a <literal>GROUP BY</literal> on all
+    expressions in the target list that do not contain either an aggregate or
+    a window function.
    </para>
 
    <para>
